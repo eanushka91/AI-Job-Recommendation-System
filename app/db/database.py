@@ -53,6 +53,7 @@ def create_tables(conn):
                 skills TEXT[],
                 experience TEXT[],
                 education TEXT[],
+                location TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')

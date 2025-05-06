@@ -197,7 +197,8 @@ async def search_jobs(
         query: str = Query(..., min_length=1),
         location: Optional[str] = Query(None),
         page: int = Query(1, ge=1),
-        size: int = Query(DEFAULT_RECOMMENDATIONS_COUNT, ge=1, le=50)
+        size: int = Query(DEFAULT_RECOMMENDATIONS_COUNT, ge=1, le=50),
+        load_more: bool = Query(False)
 ):
     """
     Search for jobs by keyword and location
@@ -207,6 +208,7 @@ async def search_jobs(
         location: Optional job location
         page: Page number
         size: Page size
+        load_more: If True, will fetch more jobs if needed
 
     Returns:
         Matching jobs
@@ -215,11 +217,17 @@ async def search_jobs(
         # Generate cache key for search
         cache_key = f"search_{query}_{location}"
 
-        # Search for jobs
+        # Check if we need to fetch more jobs if load_more is True and we're beyond page 1
+        fetch_new = load_more and page > 1
+
+        # Search for jobs with pagination awareness
         all_jobs = RecommendationEngine.search_jobs(
             query=query,
             location=location,
-            cache_key=cache_key
+            cache_key=cache_key,
+            page=page,
+            size=size,
+            fetch_more=fetch_new
         )
 
         # Paginate the results
@@ -318,6 +326,54 @@ async def delete_cv(resume_id: int):
 
     except Exception as e:
         print(f"Error in delete-cv endpoint: {str(e)}")
+        return JSONResponse(
+            status_code=500,
+            content={"message": f"An error occurred: {str(e)}"}
+        )
+
+
+@router.get("/load-more-jobs")
+async def load_more_jobs(
+        query: str = Query(..., min_length=1),
+        location: Optional[str] = Query(None),
+        page: int = Query(1, ge=1),
+        size: int = Query(DEFAULT_RECOMMENDATIONS_COUNT, ge=1, le=50),
+        resume_id: Optional[int] = Query(None)
+):
+    """
+    Explicit endpoint for loading more jobs (useful for frontend "Load More" button)
+
+    Args:
+        query: Search term
+        location: Optional job location
+        page: Page number to load
+        size: Page size
+        resume_id: Optional resume ID if loading based on resume
+
+    Returns:
+        Next batch of jobs
+    """
+    try:
+        if resume_id:
+            # Get resume-based recommendations
+            return await get_recommendations(
+                resume_id=resume_id,
+                location=location,
+                page=page,
+                size=size
+            )
+        else:
+            # Get search-based results with load_more flag
+            return await search_jobs(
+                query=query,
+                location=location,
+                page=page,
+                size=size,
+                load_more=True
+            )
+
+    except Exception as e:
+        print(f"Error in load-more-jobs endpoint: {str(e)}")
         return JSONResponse(
             status_code=500,
             content={"message": f"An error occurred: {str(e)}"}

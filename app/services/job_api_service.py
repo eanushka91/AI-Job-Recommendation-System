@@ -13,7 +13,8 @@ class JobAPIService:
     def fetch_jobs(
             keywords: Optional[List[str]] = None,
             location: Optional[str] = None,
-            limit: int = 50
+            limit: int = 50,
+            page: int = 1  # Added page parameter
     ) -> List[Dict[str, Any]]:
         """
         Fetch jobs from Jooble API
@@ -22,6 +23,7 @@ class JobAPIService:
             keywords: List of job keywords (e.g., skills)
             location: Job location
             limit: Maximum number of jobs to return
+            page: Page number for pagination
 
         Returns:
             List of job listings
@@ -47,6 +49,9 @@ class JobAPIService:
             # Add page size to query
             search_query["pageSize"] = limit
 
+            # Add page number for pagination
+            search_query["page"] = page
+
             print(f"Sending API request to Jooble with params: {search_query}")
 
             # Jooble uses POST requests with a JSON body
@@ -62,7 +67,7 @@ class JobAPIService:
             )
 
             if response.status_code == 200:
-                print("Successfully received Jooble API response")
+                print(f"Successfully received Jooble API response for page {page}")
                 return JobAPIService._process_jooble_response(response.json())
             else:
                 print(f"Jooble API error: {response.status_code} - {response.text}")

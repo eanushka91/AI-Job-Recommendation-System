@@ -1,4 +1,4 @@
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
@@ -15,6 +15,9 @@ class RecommendationEngine:
     # Cache to store fetched jobs to avoid redundant API calls
     _job_cache = {}
 
+    # Keep track of pagination state for each search
+    _pagination_state = {}
+
     # Jooble API configuration
     JOOBLE_API_KEY = "2b0875d1-df2c-45a7-a65b-ff28d3c3a624"
     JOOBLE_API_URL = "https://jooble.org/api/"
@@ -22,12 +25,13 @@ class RecommendationEngine:
     @staticmethod
     def get_job_recommendations(
             skills: List[str],
-            experience: List[str],
             education: List[str],
+            experience: List[str] = None,
             location: str = None,
-            num_recommendations: int = 50,  # Get more to support pagination
+            num_recommendations: int = 50,
             cache_key: Optional[str] = None,
-            force_refresh: bool = False
+            force_refresh: bool = False,
+            page: int = 1  # Added page parameter
     ) -> List[Dict[str, Any]]:
         """
         Get job recommendations based on CV data using ML techniques
@@ -40,14 +44,26 @@ class RecommendationEngine:
             num_recommendations: Maximum number of recommendations to return
             cache_key: Optional key for caching results
             force_refresh: Force refresh cache
+            page: Page number for pagination
 
         Returns:
             List of recommended jobs with match scores
         """
-        # Check cache first if key provided and not forcing refresh
-        if not force_refresh and cache_key and cache_key in RecommendationEngine._job_cache:
-            print(f"Using cached recommendations for key: {cache_key}")
-            return RecommendationEngine._job_cache[cache_key]
+        # Reset pagination state if force refresh or first page
+        if force_refresh or page == 1:
+            if cache_key:
+                RecommendationEngine._pagination_state[cache_key] = {"current_page": 1, "has_more": True}
+
+        # If requesting a new page and we already have this page cached
+        if cache_key and not force_refresh:
+            pagination_info = RecommendationEngine._pagination_state.get(cache_key, {})
+            if pagination_info.get("current_page", 0) >= page and cache_key in RecommendationEngine._job_cache:
+                cached_jobs = RecommendationEngine._job_cache[cache_key]
+                print(f"Using cached recommendations for key: {cache_key}, page: {page}")
+                # Return the specific page from cached jobs
+                start_idx = (page - 1) * 10
+                end_idx = start_idx + 10
+                return cached_jobs[start_idx:end_idx] if len(cached_jobs) > start_idx else []
 
         # If no skills or experience provided, use fallback approach
         if not skills and not experience:
@@ -67,7 +83,8 @@ class RecommendationEngine:
             available_jobs = JobAPIService.fetch_jobs(
                 keywords=fallback_keywords,
                 location=location,
-                limit=num_recommendations
+                limit=10,  # Get only 10 jobs per page
+                page=page  # Pass page parameter
             )
         else:
             # Extract relevant keywords for job search
@@ -78,21 +95,23 @@ class RecommendationEngine:
             available_jobs = JobAPIService.fetch_jobs(
                 keywords=search_keywords,
                 location=location,
-                limit=max(50, num_recommendations)  # Fetch enough jobs for good recommendations
+                limit=10,  # Get only 10 jobs per page
+                page=page  # Pass page parameter
             )
 
-        print(f"Fetched {len(available_jobs)} jobs from API")
+        print(f"Fetched {len(available_jobs)} jobs from API for page {page}")
 
         # If no jobs found, try directly with Jooble API
         if not available_jobs:
-            print("No jobs found from JobAPIService, trying Jooble API directly")
+            print(f"No jobs found from JobAPIService, trying Jooble API directly for page {page}")
             search_keywords = RecommendationEngine._extract_search_keywords(skills, experience)
             available_jobs = RecommendationEngine._fetch_jobs_from_jooble(
                 keywords=search_keywords,
                 location=location,
-                limit=max(50, num_recommendations)
+                limit=10,  # Get only 10 jobs per page
+                page=page  # Pass page parameter
             )
-            print(f"Fetched {len(available_jobs)} jobs from Jooble API")
+            print(f"Fetched {len(available_jobs)} jobs from Jooble API for page {page}")
 
         # Create user profile for similarity comparison
         user_profile = RecommendationEngine._create_user_profile(skills, experience, education)
@@ -101,13 +120,37 @@ class RecommendationEngine:
         recommendations = RecommendationEngine._match_jobs_to_profile(
             user_profile,
             available_jobs,
-            num_recommendations
+            10  # Always process 10 jobs
         )
 
-        # Cache results if key provided
+        # Update pagination state
         if cache_key:
-            RecommendationEngine._job_cache[cache_key] = recommendations
-            print(f"Cached recommendations with key: {cache_key}")
+            # Update our pagination state
+            pagination_info = RecommendationEngine._pagination_state.get(cache_key,
+                                                                         {"current_page": 0, "has_more": True})
+            pagination_info["current_page"] = max(pagination_info["current_page"], page)
+            pagination_info["has_more"] = len(available_jobs) > 0
+            RecommendationEngine._pagination_state[cache_key] = pagination_info
+
+            # Update cache with the new jobs
+            if page == 1 or force_refresh:
+                # For first page or refresh, replace cache
+                RecommendationEngine._job_cache[cache_key] = recommendations
+            else:
+                # For subsequent pages, append to cache
+                if cache_key in RecommendationEngine._job_cache:
+                    existing_jobs = RecommendationEngine._job_cache[cache_key]
+                    # Append new jobs without duplicates
+                    existing_ids = {job['id'] for job in existing_jobs}
+                    for job in recommendations:
+                        if job['id'] not in existing_ids:
+                            existing_jobs.append(job)
+                    RecommendationEngine._job_cache[cache_key] = existing_jobs
+                else:
+                    RecommendationEngine._job_cache[cache_key] = recommendations
+
+            print(
+                f"Updated cache for key: {cache_key}, page: {page}, total jobs: {len(RecommendationEngine._job_cache.get(cache_key, []))}")
 
         return recommendations
 
@@ -300,7 +343,12 @@ class RecommendationEngine:
         return sorted_jobs[:num_recommendations]
 
     @staticmethod
-    def _fetch_jobs_from_jooble(keywords: List[str], location: str = None, limit: int = 50) -> List[Dict[str, Any]]:
+    def _fetch_jobs_from_jooble(
+            keywords: List[str],
+            location: str = None,
+            limit: int = 10,
+            page: int = 1  # Added page parameter
+    ) -> List[Dict[str, Any]]:
         """
         Fetch job listings directly from Jooble API
 
@@ -308,6 +356,7 @@ class RecommendationEngine:
             keywords: List of search keywords
             location: Optional location for job search
             limit: Maximum number of jobs to return
+            page: Page number for pagination
 
         Returns:
             List of job listings from Jooble
@@ -319,7 +368,8 @@ class RecommendationEngine:
             # Build request payload
             payload = {
                 "keywords": search_query,
-                "pageSize": limit
+                "pageSize": limit,
+                "page": page  # Add page parameter
             }
 
             # Add location if provided
@@ -382,13 +432,24 @@ class RecommendationEngine:
         if cache_key:
             if cache_key in RecommendationEngine._job_cache:
                 del RecommendationEngine._job_cache[cache_key]
+                # Also clear pagination state
+                if cache_key in RecommendationEngine._pagination_state:
+                    del RecommendationEngine._pagination_state[cache_key]
                 print(f"Cleared cache for key: {cache_key}")
         else:
             RecommendationEngine._job_cache = {}
+            RecommendationEngine._pagination_state = {}
             print("Cleared entire recommendation cache")
 
     @staticmethod
-    def search_jobs(query: str, location: str = None, cache_key: Optional[str] = None) -> List[Dict[str, Any]]:
+    def search_jobs(
+            query: str,
+            location: str = None,
+            cache_key: Optional[str] = None,
+            page: int = 1,  # Added page parameter
+            size: int = 10,
+            fetch_more: bool = False
+    ) -> List[Dict[str, Any]]:
         """
         Search for jobs by keyword and location
 
@@ -396,57 +457,108 @@ class RecommendationEngine:
             query: Search term
             location: Job location
             cache_key: Optional cache key
+            page: Page number
+            size: Page size
+            fetch_more: If True, fetch a new page from API
 
         Returns:
             List of matching jobs
         """
+        # Check if we should fetch new jobs or use cache
+        should_fetch_new = fetch_more or page == 1
+
         # Check cache first
-        if cache_key and cache_key in RecommendationEngine._job_cache:
-            return RecommendationEngine._job_cache[cache_key]
+        if not should_fetch_new and cache_key and cache_key in RecommendationEngine._job_cache:
+            cached_jobs = RecommendationEngine._job_cache[cache_key]
+            # Do we have enough jobs for this page?
+            required_jobs = page * size
+            if len(cached_jobs) >= required_jobs:
+                print(f"Using cached search results for key: {cache_key}, page: {page}")
+                return cached_jobs
+            else:
+                # We need to fetch more
+                should_fetch_new = True
 
-        # Fetch jobs using API service
-        search_keywords = [term.strip() for term in query.split() if term.strip()]
-        jobs = JobAPIService.fetch_jobs(
-            keywords=search_keywords,
-            location=location,
-            limit=50
-        )
-
-        # If no jobs found, try Jooble API directly
-        if not jobs:
-            print("No jobs found from JobAPIService, trying Jooble API directly")
-            jobs = RecommendationEngine._fetch_jobs_from_jooble(
+        if should_fetch_new:
+            # Fetch new jobs using API service
+            search_keywords = [term.strip() for term in query.split() if term.strip()]
+            jobs = JobAPIService.fetch_jobs(
                 keywords=search_keywords,
                 location=location,
-                limit=50
+                limit=size,  # Get exactly the requested size
+                page=page  # Request the specific page
             )
 
-        # Assign relevance scores (simple matching for search)
-        for job in jobs:
-            # Count occurrences of search terms
-            relevance = 0
-            content = job.get('content', '').lower()
-            title = job.get('title', '').lower()
+            # If no jobs found, try Jooble API directly
+            if not jobs:
+                print(f"No jobs found from JobAPIService, trying Jooble API directly for page {page}")
+                jobs = RecommendationEngine._fetch_jobs_from_jooble(
+                    keywords=search_keywords,
+                    location=location,
+                    limit=size,
+                    page=page
+                )
 
-            # Title matches are weighted higher
-            for term in search_keywords:
-                term = term.lower()
-                if term in title:
-                    relevance += 5
-                if term in content:
-                    relevance += 1
+            # Assign relevance scores (simple matching for search)
+            for job in jobs:
+                # Count occurrences of search terms
+                relevance = 0
+                content = job.get('content', '').lower()
+                title = job.get('title', '').lower()
 
-            # Convert to percentage
-            job['match_score'] = min(relevance * 10, 100.0)
+                # Title matches are weighted higher
+                for term in search_keywords:
+                    term = term.lower()
+                    if term in title:
+                        relevance += 5
+                    if term in content:
+                        relevance += 1
 
-        # Sort by relevance
-        sorted_jobs = sorted(jobs, key=lambda x: x['match_score'], reverse=True)
+                # Convert to percentage
+                job['match_score'] = min(relevance * 10, 100.0)
 
-        # Cache results
-        if cache_key:
-            RecommendationEngine._job_cache[cache_key] = sorted_jobs
+            # Sort by relevance
+            sorted_jobs = sorted(jobs, key=lambda x: x['match_score'], reverse=True)
 
-        return sorted_jobs
+            # Update cache
+            if cache_key:
+                if page == 1:
+                    # For first page, replace cache
+                    RecommendationEngine._job_cache[cache_key] = sorted_jobs
+                else:
+                    # For subsequent pages, append to cache
+                    if cache_key in RecommendationEngine._job_cache:
+                        existing_jobs = RecommendationEngine._job_cache[cache_key]
+                        # Get existing IDs to avoid duplicates
+                        existing_ids = {job['id'] for job in existing_jobs}
+                        # Append new unique jobs
+                        for job in sorted_jobs:
+                            if job['id'] not in existing_ids:
+                                existing_jobs.append(job)
+                        # Update cache
+                        RecommendationEngine._job_cache[cache_key] = existing_jobs
+                    else:
+                        RecommendationEngine._job_cache[cache_key] = sorted_jobs
+
+            return sorted_jobs
+        else:
+            # Return empty list if we shouldn't fetch and don't have cache
+            return []
+
+    @staticmethod
+    def has_more_jobs(cache_key: str) -> bool:
+        """
+        Check if there are potentially more jobs available to fetch
+
+        Args:
+            cache_key: Cache key to check
+
+        Returns:
+            True if there might be more jobs to fetch
+        """
+        if cache_key in RecommendationEngine._pagination_state:
+            return RecommendationEngine._pagination_state[cache_key].get("has_more", True)
+        return True  # Assume more by default
 
     @staticmethod
     def get_job_stats(skills: List[str], experience: List[str], education: List[str]) -> Dict[str, Any]:

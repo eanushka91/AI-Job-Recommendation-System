@@ -10,6 +10,7 @@ class ResumeResponse(BaseModel):
     skills: List[str]
     experience: List[str]
     education: List[str]
+    location: str
     created_at: datetime
 
 class UploadResponse(BaseModel):

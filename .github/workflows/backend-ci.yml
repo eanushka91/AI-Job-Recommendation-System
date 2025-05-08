@@ -1,0 +1,67 @@
+# File path MUST be: .github/workflows/backend-ci.yml (or similar .yml name)
+
+# Workflow name displayed on GitHub Actions tab
+name: Backend CI Pipeline
+
+# Events that trigger this workflow
+on: # Ensure 'on:' is at the root level (no indentation)
+  push: # Indent events under 'on:' (e.g., 2 spaces)
+    branches: [ "main" ] # Indent conditions under the event (e.g., 4 spaces)
+  pull_request:
+    branches: [ "main" ]
+
+# Jobs to run in the workflow
+jobs: # Ensure 'jobs:' is at the root level
+  build-and-test: # Name of the job, indented under 'jobs:'
+    # Runner environment
+    runs-on: ubuntu-latest # Indented under the job name
+
+    # Strategy for matrix testing (optional)
+    strategy: # Indented under the job name
+      matrix: # Indented under strategy
+        # Define Python versions to test against
+        python-version: ["3.10"] # Indented under matrix, use your project's version
+
+    # Steps to execute in the job
+    steps: # Indented under the job name
+      # Step 1: Check out the repository code
+      - name: Check out repository code
+        uses: actions/checkout@v4 # Standard action, indented under steps
+
+      # Step 2: Set up the specified Python version
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with: # Indented under the action usage
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip' # Cache pip dependencies
+
+      # Step 3: Install project dependencies
+      - name: Install dependencies
+        run: | # Use '|' for multi-line scripts, indented under step name
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          # Install testing/linting tools if not in requirements.txt
+          pip install pytest pytest-cov ruff
+
+      # Step 4: Lint and Format Check (using Ruff)
+      - name: Lint and Format Check with Ruff
+        run: |
+          ruff check . --output-format=github
+          ruff format . --check
+
+      # Step 5: Run tests using Pytest
+      - name: Run tests with Pytest
+        run: |
+          # Run tests, generate coverage report, fail if coverage is below 80%
+          pytest --cov=app --cov-report=term-missing --cov-fail-under=80
+        # --- Environment Variables for Tests (Secrets) ---
+        # Only needed for integration tests requiring real credentials.
+        # Keep commented out for unit tests using mocks.
+        # env:
+        #   TEST_DATABASE_URL: ${{ secrets.TEST_DATABASE_URL }}
+        #   JOOBLE_API_KEY: ${{ secrets.TEST_JOOBLE_API_KEY }}
+        #   AWS_ACCESS_KEY_ID: ${{ secrets.TEST_AWS_ACCESS_KEY_ID }}
+        #   AWS_SECRET_ACCESS_KEY: ${{ secrets.TEST_AWS_SECRET_ACCESS_KEY }}
+        #   AWS_REGION: ${{ secrets.TEST_AWS_REGION }}
+        #   S3_BUCKET_NAME: ${{ secrets.TEST_S3_BUCKET_NAME }}
+

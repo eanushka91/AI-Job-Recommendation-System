@@ -1,4 +1,4 @@
-# .GitHub/workflows/backend-ci.yml
+# .github/workflows/backend-ci.yml
 
 name: Backend CI Pipeline
 
@@ -19,40 +19,37 @@ jobs:
       - name: Check out repository code
         uses: actions/checkout@v4
 
-      # --- DEBUG STEP: Check the file structure after checkout ---
-      - name: List files in workspace
+      - name: List files in workspace # Keep this for debugging
         run: |
           echo "Current directory: $(pwd)"
           echo "Workspace content:"
-          ls -la # Use 'ls -la' for more details including hidden files
+          ls -la
           echo "--- Recursive listing: ---"
           ls -R
           echo "--- End file listing ---"
-      # --- END DEBUG STEP ---
 
       - name: Set up Python ${{ matrix.python-version }}
-        id: setup-python # Add an id for potential future use
+        id: setup-python
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-          # Cache pip dependencies based on requirements.txt hash
-          # This step fails if requirements.txt is not found at the expected path
           cache: 'pip'
-          # If requirements.txt is NOT at the root, uncomment and set the path:
-          # cache-dependency-path: 'path/to/your/requirements.txt'
+          # --- Explicitly tell the action where the requirements file is ---
+          # Assumes requirements.txt is in the root directory after checkout
+          cache-dependency-path: requirements.txt
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          # This assumes requirements.txt is in the current working directory (repository root)
+          # Check if file exists before installing
           if [ -f requirements.txt ]; then
+             echo "Found requirements.txt, installing dependencies..."
              pip install -r requirements.txt
           else
-             echo "requirements.txt not found in $(pwd)!"
-             exit 1 # Fail the job if requirements.txt is missing
+             echo "ERROR: requirements.txt not found in $(pwd)!"
+             exit 1 # Fail the job explicitly
           fi
-          # Install tools needed for subsequent steps if not in requirements.txt
-          pip install pytest pytest-cov ruff
+          pip install pytest pytest-cov ruff # Install test/lint tools
 
       - name: Lint and Format Check with Ruff
         run: |
@@ -62,4 +59,5 @@ jobs:
       - name: Run tests with Pytest
         run: |
           pytest --cov=app --cov-report=term-missing --cov-fail-under=80
-        # env: ... (secrets if needed for integration tests)
+        # env: ... (secrets if needed)
+

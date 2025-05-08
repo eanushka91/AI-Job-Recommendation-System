@@ -74,7 +74,7 @@ def test_upload_cv_s3_failure(
 
     assert response.status_code == 500
     # Check detail field if using HTTPException now
-    assert "Internal server error occurred during CV upload" in response.json()["detail"]
+    assert "internal server error occurred during CV upload" in response.json()["detail"]
     # Or if still using JSONResponse:
     # assert f"An error occurred: {s3_error_msg}" in response.json()["message"]
 

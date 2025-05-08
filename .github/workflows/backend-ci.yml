@@ -1,62 +1,57 @@
-# File path MUST be: .github/workflows/backend-ci.yml
+    # .github/workflows/backend-ci.yml
 
-# Workflow name displayed on GitHub Actions tab
-name: Backend CI Pipeline
+    name: Backend CI Pipeline
 
-# Events that trigger this workflow
-# Ensure 'on:' is at the very beginning of the line (no spaces before it)
-on:
-  # Indent trigger events (e.g., push, pull_request) by 2 spaces
-  push:
-    # Indent conditions (e.g., branches) by 2 more spaces (4 total)
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+    on:
+      push:
+        branches: [ "main" ]
+      pull_request:
+        branches: [ "main" ]
 
-# Jobs defined in the workflow
-# Ensure 'jobs:' is also at the very beginning of the line
-jobs:
-  # Name of the job (can be anything), indented by 2 spaces
-  build-and-test:
-    # Runner environment, indented under the job name (4 spaces total)
-    runs-on: ubuntu-latest
+    jobs:
+      build-and-test:
+        runs-on: ubuntu-latest
+        strategy:
+          matrix:
+            python-version: ["3.10"] # Use your project's Python version
 
-    # Strategy for matrix testing (optional)
-    strategy: # Indented same level as runs-on (4 spaces)
-      matrix: # Indented under strategy (6 spaces)
-        python-version: ["3.10"] # Use your project's Python version
+        steps:
+          - name: Check out repository code
+            uses: actions/checkout@v4
 
-    # Steps within the job
-    steps: # Indented under the job name (4 spaces)
-      # Step name starts with '-', indented (6 spaces)
-      - name: Check out repository code
-        uses: actions/checkout@v4 # 'uses' is indented under the step (8 spaces)
+          # --- DEBUG STEP: Add this to see the file structure ---
+          - name: List files in workspace
+            run: |
+              echo "Current directory: $(pwd)"
+              echo "Listing files recursively:"
+              ls -R
+          # --- END DEBUG STEP ---
 
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
-        with: # 'with' is indented under the action usage (8 spaces)
-          python-version: ${{ matrix.python-version }}
-          cache: 'pip'
+          - name: Set up Python ${{ matrix.python-version }}
+            uses: actions/setup-python@v5
+            with:
+              python-version: ${{ matrix.python-version }}
+              # Keep cache enabled, let's see if the file exists first
+              cache: 'pip'
+              # Optional: Explicitly point to the requirements file if it's not at the root
+              # cache-dependency-path: path/to/your/requirements.txt
 
-      - name: Install dependencies
-        run: | # 'run' is indented under the step (8 spaces), '|' indicates multi-line script
-          # Script lines are indented further (10 spaces)
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pytest pytest-cov ruff # Install test/lint tools
+          - name: Install dependencies
+            run: |
+              python -m pip install --upgrade pip
+              # This command assumes requirements.txt is in the root directory
+              # where the command is run (usually the workspace root after checkout)
+              pip install -r requirements.txt
+              pip install pytest pytest-cov ruff # Install test/lint tools
 
-      - name: Lint and Format Check with Ruff
-        run: |
-          ruff check . --output-format=github
-          ruff format . --check
+          - name: Lint and Format Check with Ruff
+            run: |
+              ruff check . --output-format=github
+              ruff format . --check
 
-      - name: Run tests with Pytest
-        run: |
-          pytest --cov=app --cov-report=term-missing --cov-fail-under=80 # Example coverage check
-        # env: # Keep env commented out if not using secrets for unit tests
-        #   TEST_DATABASE_URL: ${{ secrets.TEST_DATABASE_URL }}
-        #   JOOBLE_API_KEY: ${{ secrets.TEST_JOOBLE_API_KEY }}
-        #   AWS_ACCESS_KEY_ID: ${{ secrets.TEST_AWS_ACCESS_KEY_ID }}
-        #   AWS_SECRET_ACCESS_KEY: ${{ secrets.TEST_AWS_SECRET_ACCESS_KEY }}
-        #   AWS_REGION: ${{ secrets.TEST_AWS_REGION }}
-        #   S3_BUCKET_NAME: ${{ secrets.TEST_S3_BUCKET_NAME }}
+          - name: Run tests with Pytest
+            run: |
+              pytest --cov=app --cov-report=term-missing --cov-fail-under=80
+            # env: ... (secrets if needed)
+
+    

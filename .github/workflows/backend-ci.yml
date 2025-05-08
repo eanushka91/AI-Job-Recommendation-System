@@ -1,67 +1,62 @@
-# File path MUST be: .github/workflows/backend-ci.yml (or similar .yml name)
+# File path MUST be: .github/workflows/backend-ci.yml
 
 # Workflow name displayed on GitHub Actions tab
 name: Backend CI Pipeline
 
 # Events that trigger this workflow
-on: # Ensure 'on:' is at the root level (no indentation)
-  push: # Indent events under 'on:' (e.g., 2 spaces)
-    branches: [ "main" ] # Indent conditions under the event (e.g., 4 spaces)
+# Ensure 'on:' is at the very beginning of the line (no spaces before it)
+on:
+  # Indent trigger events (e.g., push, pull_request) by 2 spaces
+  push:
+    # Indent conditions (e.g., branches) by 2 more spaces (4 total)
+    branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
 
-# Jobs to run in the workflow
-jobs: # Ensure 'jobs:' is at the root level
-  build-and-test: # Name of the job, indented under 'jobs:'
-    # Runner environment
-    runs-on: ubuntu-latest # Indented under the job name
+# Jobs defined in the workflow
+# Ensure 'jobs:' is also at the very beginning of the line
+jobs:
+  # Name of the job (can be anything), indented by 2 spaces
+  build-and-test:
+    # Runner environment, indented under the job name (4 spaces total)
+    runs-on: ubuntu-latest
 
     # Strategy for matrix testing (optional)
-    strategy: # Indented under the job name
-      matrix: # Indented under strategy
-        # Define Python versions to test against
-        python-version: ["3.10"] # Indented under matrix, use your project's version
+    strategy: # Indented same level as runs-on (4 spaces)
+      matrix: # Indented under strategy (6 spaces)
+        python-version: ["3.10"] # Use your project's Python version
 
-    # Steps to execute in the job
-    steps: # Indented under the job name
-      # Step 1: Check out the repository code
+    # Steps within the job
+    steps: # Indented under the job name (4 spaces)
+      # Step name starts with '-', indented (6 spaces)
       - name: Check out repository code
-        uses: actions/checkout@v4 # Standard action, indented under steps
+        uses: actions/checkout@v4 # 'uses' is indented under the step (8 spaces)
 
-      # Step 2: Set up the specified Python version
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
-        with: # Indented under the action usage
+        with: # 'with' is indented under the action usage (8 spaces)
           python-version: ${{ matrix.python-version }}
-          cache: 'pip' # Cache pip dependencies
+          cache: 'pip'
 
-      # Step 3: Install project dependencies
       - name: Install dependencies
-        run: | # Use '|' for multi-line scripts, indented under step name
+        run: | # 'run' is indented under the step (8 spaces), '|' indicates multi-line script
+          # Script lines are indented further (10 spaces)
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          # Install testing/linting tools if not in requirements.txt
-          pip install pytest pytest-cov ruff
+          pip install pytest pytest-cov ruff # Install test/lint tools
 
-      # Step 4: Lint and Format Check (using Ruff)
       - name: Lint and Format Check with Ruff
         run: |
           ruff check . --output-format=github
           ruff format . --check
 
-      # Step 5: Run tests using Pytest
       - name: Run tests with Pytest
         run: |
-          # Run tests, generate coverage report, fail if coverage is below 80%
-          pytest --cov=app --cov-report=term-missing --cov-fail-under=80
-        # --- Environment Variables for Tests (Secrets) ---
-        # Only needed for integration tests requiring real credentials.
-        # Keep commented out for unit tests using mocks.
-        # env:
+          pytest --cov=app --cov-report=term-missing --cov-fail-under=80 # Example coverage check
+        # env: # Keep env commented out if not using secrets for unit tests
         #   TEST_DATABASE_URL: ${{ secrets.TEST_DATABASE_URL }}
         #   JOOBLE_API_KEY: ${{ secrets.TEST_JOOBLE_API_KEY }}
         #   AWS_ACCESS_KEY_ID: ${{ secrets.TEST_AWS_ACCESS_KEY_ID }}
         #   AWS_SECRET_ACCESS_KEY: ${{ secrets.TEST_AWS_SECRET_ACCESS_KEY }}
         #   AWS_REGION: ${{ secrets.TEST_AWS_REGION }}
         #   S3_BUCKET_NAME: ${{ secrets.TEST_S3_BUCKET_NAME }}
-

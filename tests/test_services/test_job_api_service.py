@@ -5,10 +5,10 @@ from app.services.job_api_service import JobAPIService
 import requests
 from unittest.mock import MagicMock
 
-SETTINGS_API_KEY_PATH = 'app.config.settings.JOOBLE_API_KEY'
+SETTINGS_API_KEY_PATH = "app.config.settings.JOOBLE_API_KEY"
+
 
 class TestJobAPIService:
-
     def test_fetch_jobs_success(self, mocker):
         MOCKED_KEY = "key_success_001"
         mocker.patch(SETTINGS_API_KEY_PATH, MOCKED_KEY, create=True)
@@ -33,7 +33,9 @@ class TestJobAPIService:
     def test_fetch_jobs_requests_exception(self, mocker):
         MOCKED_KEY = "key_req_exception_003"
         mocker.patch(SETTINGS_API_KEY_PATH, MOCKED_KEY, create=True)
-        mock_post = mocker.patch("requests.post", side_effect=requests.exceptions.ConnectTimeout("Timeout"))
+        mock_post = mocker.patch(
+            "requests.post", side_effect=requests.exceptions.ConnectTimeout("Timeout")
+        )
         jobs = JobAPIService.fetch_jobs(keywords=["kw_req_exc"])
         assert jobs == []
         mock_post.assert_called_once()

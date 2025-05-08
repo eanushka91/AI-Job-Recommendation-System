@@ -1,6 +1,11 @@
 import boto3
 from botocore.exceptions import NoCredentialsError
-from app.config.settings import AWS_ACCESS_KEY, AWS_SECRET_KEY, AWS_REGION, S3_BUCKET_NAME
+from app.config.settings import (
+    AWS_ACCESS_KEY,
+    AWS_SECRET_KEY,
+    AWS_REGION,
+    S3_BUCKET_NAME,
+)
 
 
 class S3Service:
@@ -26,10 +31,10 @@ class S3Service:
 
         # Create S3 client
         s3 = boto3.client(
-            's3',
+            "s3",
             aws_access_key_id=AWS_ACCESS_KEY,
             aws_secret_access_key=AWS_SECRET_KEY,
-            region_name=AWS_REGION
+            region_name=AWS_REGION,
         )
 
         try:

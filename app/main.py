@@ -33,7 +33,7 @@ app = FastAPI(
     title="CV Upload System",
     description="API for CV upload and job recommendations.",  # Added description
     version="1.0.0",  # Added version
-    lifespan=lifespan  # Pass the lifespan function here
+    lifespan=lifespan,  # Pass the lifespan function here
 )
 
 # --- Remove the old @app.on_event decorator and function ---

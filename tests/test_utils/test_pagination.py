@@ -3,13 +3,14 @@
 # import pytest # Removed F401
 from app.api.pagination import paginate
 
+
 class MockPageParamsForPagination:
     def __init__(self, page, size):
         self.page = page
         self.size = size
 
-class TestPaginationUtil:
 
+class TestPaginationUtil:
     def test_paginate_page_out_of_bounds_low(self):
         items = list(range(20))
         page_params = MockPageParamsForPagination(page=0, size=5)

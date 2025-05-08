@@ -1,6 +1,11 @@
 import boto3
-from botocore.exceptions import NoCredentialsError, ClientError # Added ClientError
-from app.config.settings import AWS_ACCESS_KEY, AWS_SECRET_KEY, AWS_REGION, S3_BUCKET_NAME
+from botocore.exceptions import NoCredentialsError, ClientError  # Added ClientError
+from app.config.settings import (
+    AWS_ACCESS_KEY,
+    AWS_SECRET_KEY,
+    AWS_REGION,
+    S3_BUCKET_NAME,
+)
 
 
 class S3Service:
@@ -26,10 +31,10 @@ class S3Service:
 
         # Create S3 client
         s3 = boto3.client(
-            's3',
+            "s3",
             aws_access_key_id=AWS_ACCESS_KEY,
             aws_secret_access_key=AWS_SECRET_KEY,
-            region_name=AWS_REGION
+            region_name=AWS_REGION,
         )
 
         try:
@@ -49,7 +54,7 @@ class S3Service:
             print("S3 Upload Error: AWS credentials not available")
             raise Exception("AWS credentials not available")
         except Exception as e:
-            print(f"S3 Upload Error: {str(e)}") # Log the error
+            print(f"S3 Upload Error: {str(e)}")  # Log the error
             raise Exception(f"S3 upload error: {str(e)}")
 
     @staticmethod
@@ -67,8 +72,12 @@ class S3Service:
             print("S3 Delete Error: S3_BUCKET_NAME is not configured.")
             return False
 
-        if not file_url or not file_url.startswith(f"https://{S3_BUCKET_NAME}.s3.amazonaws.com/"):
-            print(f"S3 Delete Error: Invalid S3 URL or URL not from the configured bucket: {file_url}")
+        if not file_url or not file_url.startswith(
+            f"https://{S3_BUCKET_NAME}.s3.amazonaws.com/"
+        ):
+            print(
+                f"S3 Delete Error: Invalid S3 URL or URL not from the configured bucket: {file_url}"
+            )
             return False
 
         try:
@@ -80,22 +89,24 @@ class S3Service:
                 return False
 
             s3 = boto3.client(
-                's3',
+                "s3",
                 aws_access_key_id=AWS_ACCESS_KEY,
                 aws_secret_access_key=AWS_SECRET_KEY,
-                region_name=AWS_REGION
+                region_name=AWS_REGION,
             )
             s3.delete_object(Bucket=S3_BUCKET_NAME, Key=object_name)
             print(f"Successfully deleted {object_name} from S3 bucket {S3_BUCKET_NAME}")
             return True
         except NoCredentialsError:
             print("S3 Delete Error: AWS credentials not available.")
-            return False # Silently return False as per discussion for routes
+            return False  # Silently return False as per discussion for routes
         except ClientError as e:
             # Handles S3-specific errors. delete_object usually doesn't error for "NoSuchKey".
             # But other errors like "AccessDenied" could occur.
             error_code = e.response.get("Error", {}).get("Code")
-            print(f"S3 Delete Error (ClientError): Code: {error_code}, Message: {str(e)}")
+            print(
+                f"S3 Delete Error (ClientError): Code: {error_code}, Message: {str(e)}"
+            )
             return False
         except Exception as e:
             print(f"S3 Delete Error (Generic): {str(e)}")

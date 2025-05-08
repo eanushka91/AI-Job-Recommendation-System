@@ -59,11 +59,13 @@ def test_db_connection():
         from app.db.database import create_tables
         create_tables(conn)
     except Exception as e:
-        if conn: conn.close()
+        if conn:
+            conn.close()  # <--- E701 හදපු ලයින් එක (කලින්: if conn: conn.close())
         pytest.skip(f"Table creation in test DB ('{TEST_DB_NAME}') failed: {e}.")
         return None
     yield conn
-    if conn: conn.close()
+    if conn:
+        conn.close()  # <--- E701 හදපු ලයින් එක (කලින්: if conn: conn.close())
 
 @pytest.fixture(scope="function")
 def db_session_for_integration(test_db_connection):
@@ -83,11 +85,9 @@ def client():
     if not app:
         pytest.skip("FastAPI 'app' instance not loaded. Skipping client-dependent tests.")
 
-    # *** THE FIX IS HERE ***
     # Initialize TestClient with the app instance as the first argument
-    with TestClient(app) as test_client: # Changed from TestClient(app=app)
+    with TestClient(app) as test_client:
         yield test_client
-    # *** END FIX ***
 
 # --- Mocking Fixtures (Remain the same as previous version) ---
 @pytest.fixture

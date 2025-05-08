@@ -2,8 +2,7 @@
 
 from app.db.database import get_db_connection
 from psycopg2.extras import RealDictCursor
-# Removed Optional from import as it was reported unused (F401)
-# Keep List, Dict, Any if they are used.
+# Removed Optional as unused based on previous Ruff report
 from typing import List, Dict, Any
 import logging
 
@@ -13,37 +12,42 @@ class UserModel:
     """Model to handle database operations for users"""
 
     @staticmethod
-    def create() -> int | None: # Return type hint
+    def create() -> int | None:
         """Create a new user and return the ID, or None on failure."""
         conn = None
         user_id = None
         try:
             conn = get_db_connection()
-            if not conn: raise Exception("Failed to get DB connection")
+            if not conn:
+                raise Exception("Failed to get DB connection")
             with conn.cursor() as cur:
                 cur.execute("INSERT INTO users DEFAULT VALUES RETURNING id")
                 result = cur.fetchone()
-                if result: user_id = result[0]
+                if result:
+                    user_id = result[0] # Fixed E701: Assignment on new line
                 conn.commit()
                 if user_id is None:
-                     logger.error("Failed to retrieve user ID after insert.")
-                     return None
+                    logger.error("Failed to retrieve user ID after insert.")
+                    return None
                 logger.info(f"Created user with ID: {user_id}")
                 return user_id
         except Exception as e:
-            logger.exception(f"Error creating user: {e}") # Log traceback
-            if conn: conn.rollback()
-            return None # Return None on error instead of raising for some scenarios
+            logger.exception(f"Error creating user: {e}")
+            if conn:
+                conn.rollback() # Fixed E701: Call on new line
+            return None
         finally:
-            if conn: conn.close()
+            if conn:
+                conn.close() # Fixed E701: Call on new line
 
     @staticmethod
-    def get_by_id(user_id: int) -> Dict[str, Any] | None: # Type hints
+    def get_by_id(user_id: int) -> Dict[str, Any] | None:
         """Get a user by ID"""
         conn = None
         try:
             conn = get_db_connection()
-            if not conn: raise Exception("Failed to get DB connection")
+            if not conn:
+                raise Exception("Failed to get DB connection")
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute("SELECT id, created_at FROM users WHERE id = %s", (user_id,))
                 user = cur.fetchone()
@@ -53,21 +57,22 @@ class UserModel:
              logger.exception(f"Error getting user by ID {user_id}: {e}")
              return None
         finally:
-            if conn: conn.close()
+            if conn:
+                conn.close() # Fixed E701: Call on new line
 
 class ResumeModel:
     """Model to handle database operations for resumes"""
 
     @staticmethod
-    def create(user_id: int, cv_url: str, skills: List[str], experience: List[str], education: List[str]) -> int | None: # Type hints
+    def create(user_id: int, cv_url: str, skills: List[str], experience: List[str], education: List[str]) -> int | None:
         """Create a new resume entry in the database, return ID or None."""
         conn = None
         resume_id = None
         try:
             conn = get_db_connection()
-            if not conn: raise Exception("Failed to get DB connection")
+            if not conn:
+                raise Exception("Failed to get DB connection")
             with conn.cursor() as cur:
-                # Ensure lists are passed correctly to PostgreSQL array type
                 cur.execute(
                     """
                     INSERT INTO resumes (user_id, cv_url, skills, experience, education)
@@ -77,7 +82,8 @@ class ResumeModel:
                     (user_id, cv_url, skills, experience, education)
                 )
                 result = cur.fetchone()
-                if result: resume_id = result[0]
+                if result:
+                    resume_id = result[0] # Fixed E701: Assignment on new line
                 conn.commit()
                 if resume_id is None:
                      logger.error(f"Failed to retrieve resume ID after insert for user {user_id}.")
@@ -86,18 +92,21 @@ class ResumeModel:
                 return resume_id
         except Exception as e:
             logger.exception(f"Error creating resume for user {user_id}: {e}")
-            if conn: conn.rollback()
-            return None
+            if conn:
+                conn.rollback() # Fixed E701: Call on new line
+            return None # Return None instead of raising to allow caller to handle
         finally:
-            if conn: conn.close()
+            if conn:
+                conn.close() # Fixed E701: Call on new line
 
     @staticmethod
-    def get_by_id(resume_id: int) -> Dict[str, Any] | None: # Type hints
+    def get_by_id(resume_id: int) -> Dict[str, Any] | None:
         """Get a resume by its ID"""
         conn = None
         try:
             conn = get_db_connection()
-            if not conn: raise Exception("Failed to get DB connection")
+            if not conn:
+                raise Exception("Failed to get DB connection")
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute(
                     """
@@ -113,15 +122,17 @@ class ResumeModel:
              logger.exception(f"Error getting resume by ID {resume_id}: {e}")
              return None
         finally:
-            if conn: conn.close()
+            if conn:
+                conn.close() # Fixed E701: Call on new line
 
     @staticmethod
-    def get_by_user_id(user_id: int) -> List[Dict[str, Any]]: # Type hints
+    def get_by_user_id(user_id: int) -> List[Dict[str, Any]]:
         """Get all resumes for a specific user"""
         conn = None
         try:
             conn = get_db_connection()
-            if not conn: raise Exception("Failed to get DB connection")
+            if not conn:
+                raise Exception("Failed to get DB connection")
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute(
                     """
@@ -137,7 +148,8 @@ class ResumeModel:
              logger.exception(f"Error getting resumes for user ID {user_id}: {e}")
              return []
         finally:
-            if conn: conn.close()
+            if conn:
+                conn.close() # Fixed E701: Call on new line
 
     @staticmethod
     def delete(resume_id: int) -> bool:
@@ -145,7 +157,8 @@ class ResumeModel:
         conn = None
         try:
             conn = get_db_connection()
-            if not conn: raise Exception("Failed to get DB connection")
+            if not conn:
+                raise Exception("Failed to get DB connection")
             with conn.cursor() as cur:
                 cur.execute("DELETE FROM resumes WHERE id = %s", (resume_id,))
                 deleted_count = cur.rowcount
@@ -155,27 +168,31 @@ class ResumeModel:
                     return True
                 else:
                     logger.warning(f"Attempted to delete resume ID {resume_id}, but record not found.")
-                    return False # Or True depending on desired idempotency behavior
+                    return False
         except Exception as e:
             logger.exception(f"Error deleting resume ID {resume_id}: {e}")
-            if conn: conn.rollback()
+            if conn:
+                conn.rollback() # Fixed E701: Call on new line
             return False
         finally:
-            if conn: conn.close()
+            if conn:
+                conn.close() # Fixed E701: Call on new line
 
-    # --- Recommendation methods ---
-    # These likely belong in their own model or service, or consolidated here.
-    # Keeping them as provided in the ai_models.py context for now.
     @staticmethod
     def save_recommendations(resume_id: int, recommendations: List[Dict[str, Any]]) -> bool:
         """Save job recommendations for a resume"""
-        # (Implementation from ai_models.py context, using logging)
         conn = None
         try:
             conn = get_db_connection()
-            # ... (rest of implementation with logging as in ai_models.py) ...
+            if not conn:
+                raise Exception("Failed to get DB connection")
+            # Ensure table exists (idempotent)
             with conn.cursor() as cur:
+                # (Assuming create_tables in init_db already handled table creation)
+                # Delete old recommendations first
                 cur.execute("DELETE FROM job_recommendations WHERE resume_id = %s", (resume_id,))
+            # Insert new ones
+            with conn.cursor() as cur:
                 insert_query = """
                     INSERT INTO job_recommendations
                     (resume_id, job_id, job_title, company, location, description, url, match_score)
@@ -186,24 +203,31 @@ class ResumeModel:
                      job.get('description'), job.get('url'), job.get('match_score'))
                     for job in recommendations if isinstance(job, dict)
                 ]
-                if values_list:
+                if not values_list:
+                    logger.warning(f"No valid recommendations provided to save for resume_id: {resume_id}")
+                else:
                     cur.executemany(insert_query, values_list)
+                    logger.info(f"Saved {cur.rowcount} recommendations for resume {resume_id}")
+
             conn.commit()
             return True
         except Exception as e:
             logger.exception(f"Error saving recommendations for resume {resume_id}: {e}")
-            if conn: conn.rollback()
+            if conn:
+                conn.rollback() # Fixed E701: Call on new line
             return False
         finally:
-            if conn: conn.close()
+            if conn:
+                conn.close() # Fixed E701: Call on new line
 
     @staticmethod
     def get_recommendations(resume_id: int) -> List[Dict[str, Any]]:
         """Get stored job recommendations for a resume"""
-        # (Implementation from ai_models.py context, using logging)
         conn = None
         try:
             conn = get_db_connection()
+            if not conn:
+                raise Exception("Failed to get DB connection")
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute(
                     """
@@ -218,5 +242,6 @@ class ResumeModel:
             logger.exception(f"Error getting recommendations for resume {resume_id}: {e}")
             return []
         finally:
-            if conn: conn.close()
+            if conn:
+                conn.close() # Fixed E701: Call on new line
 

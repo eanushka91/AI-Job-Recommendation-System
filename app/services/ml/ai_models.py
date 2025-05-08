@@ -3,8 +3,7 @@
 from sklearn.feature_extraction.text import TfidfVectorizer
 from app.db.database import get_db_connection
 from psycopg2.extras import RealDictCursor
-# Removed Optional from import as it was reported unused (F401)
-# Keep List, Dict, Any if they are used elsewhere in the file.
+# Removed Optional as unused based on previous Ruff report
 from typing import List, Dict, Any
 from datetime import datetime
 from pydantic import BaseModel
@@ -21,22 +20,19 @@ class RecommendationResult(BaseModel):
     match_score: float | None = None
     description: str | None = None
     url: str | None = None
-    created_at: datetime | None = None # Matches DB schema column
+    created_at: datetime | None = None
 
 class JobRecommendationModel:
-    """
-    Handles database operations specifically for job recommendations.
-    NOTE: Consider consolidating with app/db/models.py -> ResumeModel.
-    """
+    """Handles database operations specifically for job recommendations."""
 
     @staticmethod
     def save_recommendations(resume_id: int, recommendations: List[Dict[str, Any]]) -> bool:
-        """
-        Save job recommendations to the database. Overwrites existing ones.
-        """
+        """Save job recommendations to the database."""
         conn = None
         try:
             conn = get_db_connection()
+            if not conn:
+                raise ConnectionError("Failed to get DB connection for saving recommendations.")
             with conn.cursor() as cur:
                 logger.debug(f"Deleting existing recommendations for resume_id: {resume_id}")
                 cur.execute("DELETE FROM job_recommendations WHERE resume_id = %s", (resume_id,))
@@ -49,39 +45,41 @@ class JobRecommendationModel:
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                 """
                 values_list = [
-                    (
-                        resume_id, job.get('id'), job.get('title'), job.get('company'),
-                        job.get('location'), job.get('description'), job.get('url'),
-                        job.get('match_score')
-                    ) for job in recommendations if isinstance(job, dict)
+                    (resume_id, job.get('id'), job.get('title'), job.get('company'),
+                     job.get('location'), job.get('description'), job.get('url'),
+                     job.get('match_score'))
+                    for job in recommendations if isinstance(job, dict)
                 ]
 
                 if not values_list:
-                    logger.warning(f"No valid recommendations to save for resume_id: {resume_id}")
-                    conn.commit() # Commit delete even if no inserts
-                    return True
-
-                logger.debug(f"Inserting {len(values_list)} new recommendations for resume_id: {resume_id}")
-                cur.executemany(insert_query, values_list)
-                logger.info(f"Successfully inserted {cur.rowcount} recommendations for resume_id: {resume_id}")
+                    logger.warning(f"No valid recommendations provided to save for resume_id: {resume_id}")
+                else:
+                    logger.debug(f"Inserting {len(values_list)} new recommendations for resume_id: {resume_id}")
+                    cur.executemany(insert_query, values_list)
+                    logger.info(f"Successfully inserted {cur.rowcount} recommendations for resume_id: {resume_id}")
 
             conn.commit()
             return True
         except Exception as e:
             logger.exception(f"Error saving recommendations for resume_id {resume_id}: {e}")
-            if conn: conn.rollback()
+            if conn and not conn.closed: # Check before rollback
+                try:
+                    conn.rollback() # Fixed E701
+                except Exception as rb_e:
+                    logger.error(f"Error during rollback: {rb_e}")
             return False
         finally:
-            if conn: conn.close()
+            if conn and not conn.closed: # Check before close
+                conn.close() # Fixed E701
 
     @staticmethod
     def get_recommendations(resume_id: int, limit: int = 10) -> List[RecommendationResult]:
-        """
-        Retrieve stored recommendations from database, ordered by score.
-        """
+        """Retrieve stored recommendations from database."""
         conn = None
         try:
             conn = get_db_connection()
+            if not conn:
+                raise ConnectionError("Failed to get DB connection for getting recommendations.")
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute(
                     """SELECT job_id, job_title, company, location, match_score,
@@ -105,11 +103,12 @@ class JobRecommendationModel:
             logger.exception(f"Error retrieving recommendations for resume_id {resume_id}: {e}")
             return []
         finally:
-            if conn: conn.close()
+            if conn and not conn.closed:
+                conn.close() # Fixed E701
 
 
 class MLModelConfig(BaseModel):
-    """Configuration model for ML components (e.g., TF-IDF parameters)."""
+    """Configuration model for ML components."""
     tfidf_max_features: int = 10000
     tfidf_ngram_range: tuple[int, int] = (1, 2)
 
@@ -127,7 +126,7 @@ class TrainedModel:
         logger.info("TrainedModel initialized with TF-IDF vectorizer.")
 
     def fit(self, texts: List[str]):
-        """Fit the TF-IDF vectorizer on the provided texts."""
+        """Fit the TF-IDF vectorizer."""
         if not texts:
             logger.warning("TrainedModel fit: Cannot fit on empty text list.")
             return
@@ -150,8 +149,8 @@ class TrainedModel:
             raise RuntimeError("Vectorizer is not fitted.")
         if not text or not isinstance(text, str):
              logger.warning(f"TrainedModel transform: Input text is empty or invalid type ({type(text)}).")
-             # Depending on desired behavior, might return zero vector or raise error
-             # For now, let vectorizer handle it, which might raise error.
+             # Return empty sparse matrix or handle as needed
+             return self.vectorizer.transform(['']) # Transform empty string?
         try:
             logger.debug(f"TrainedModel: Transforming text (length: {len(text)})...")
             vector = self.vectorizer.transform([text])
@@ -165,3 +164,11 @@ class TrainedModel:
 # If it looked like `if condition: statement`, change it to:
 # if condition:
 #     statement
+# Apply similar fixes for other E701 errors reported (lines 72, 75, 108)
+# Example fix for line 72 (assuming it was `if conn: conn.rollback()`):
+# if conn:
+#     conn.rollback()
+# Example fix for line 108 (assuming it was `if conn: conn.close()`):
+# if conn:
+#     conn.close()
+

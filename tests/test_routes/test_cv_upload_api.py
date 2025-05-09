@@ -75,21 +75,26 @@ def test_upload_cv_resume_creation_fails(
 def test_upload_cv_unexpected_generic_exception(
     client: TestClient,
     mock_s3_upload,
-    mock_user_model_create, # Add this fixture to the test parameters
+    mock_user_model_create,  # Add this fixture to the test parameters
     # mock_resume_model_create will be patched locally in this test
 ):
     mock_s3_upload.return_value = "http://fake-s3-url.com/generic_error.pdf"
     # SIMULATE SUCCESSFUL USER CREATION first, so we reach ResumeModel.create
-    mock_user_model_create.return_value = 123 # Assume user creation is successful
+    mock_user_model_create.return_value = 123  # Assume user creation is successful
 
     from app.db import models as db_models
+
     # Now mock ResumeModel.create to cause the generic error you want to test
     with patch.object(
         db_models.ResumeModel, "create", side_effect=ValueError("Unexpected DB trouble")
     ):
         pdf_content = b"%PDF-1.4\n%generic"
         files = {"file": ("generic.pdf", io.BytesIO(pdf_content), "application/pdf")}
-        form_data = {"skills": "s", "experience": "e", "education": "d"} # This will take the new user path
+        form_data = {
+            "skills": "s",
+            "experience": "e",
+            "education": "d",
+        }  # This will take the new user path
 
         response = client.post("/api/upload-cv", files=files, data=form_data)
 
@@ -99,7 +104,8 @@ def test_upload_cv_unexpected_generic_exception(
             response.json()["detail"]
             == "An internal server error occurred during CV upload."
         )
-    mock_user_model_create.assert_called_once() # Verify user creation mock was called
+    mock_user_model_create.assert_called_once()  # Verify user creation mock was called
+
 
 def test_get_recommendations_success(
     client: TestClient,

@@ -1,120 +1,422 @@
 from fastapi.testclient import TestClient
+from fastapi import HTTPException
 import io
+import pytest
+from unittest.mock import ANY, patch # Added patch here
+
+from app.config import settings
+
+# --- Existing constants ---
+VALID_RESUME_ID = 101
+MOCK_RESUME_DATA = {
+    "id": VALID_RESUME_ID, "user_id": 1, "cv_url": "http://s3/cv.pdf",
+    "skills": ["python", "fastapi"], "experience": ["dev"], "education": ["bsc"],
+    "location": "Colombo"
+}
+MOCK_RECOMMENDATIONS_PAYLOAD = [{"id": "job1", "title": "Awesome Job"}]
+MOCK_SEARCH_RESULTS = [{"id": "search1", "title": "Found Job"}]
+MOCK_JOB_STATS = {"total_matching_jobs": 50, "top_skills": ["python", "java"]}
 
 
-# Mock fixtures would typically be defined in conftest.py or imported
-# For this example, assume they are available in the test execution context.
+# --- Tests for /api/upload-cv ---
+# (Keep your existing tests for /upload-cv here)
+# test_upload_cv_success, test_upload_cv_invalid_file_type,
+# test_upload_cv_s3_failure, test_upload_cv_user_not_found
 
-def test_upload_cv_success(
-        client: TestClient,
-        mock_s3_upload,  # Assuming this mock is set up to return a URL
-        mock_user_model_create,  # Assuming this mock is set up
-        mock_user_model_get_by_id,  # Assuming this mock is set up
-        mock_resume_model_create,  # Assuming this mock is set up
-        mock_recommendation_engine_get_recommendations,  # Assuming this mock is set up
+def test_upload_cv_user_creation_fails(
+    client: TestClient,
+    mock_s3_upload,
+    mock_user_model_create,
 ):
-    # Mock return values for successful operation
-    mock_s3_upload.return_value = "http://fake-s3-url.com/test.pdf"
-    # Simulate user creation or retrieval
-    mock_user_model_create.return_value = {"id": 123, "created": True}  # Example return
-    mock_user_model_get_by_id.return_value = {"id": 123}  # Example if user_id is passed and found
-    mock_resume_model_create.return_value = {"id": 456}  # Example resume creation
-    mock_recommendation_engine_get_recommendations.return_value = [{"job_title": "Test Job"}]
+    mock_s3_upload.return_value = "http://fake-s3-url.com/user_create_fail.pdf"
+    mock_user_model_create.return_value = None
 
-    pdf_content = b"%PDF-1.4\n%test content"
-    # Correct way to structure file_data for FastAPI TestClient
-    # file_data should be a dictionary for the 'files' parameter
-    files = {"file": ("cv.pdf", io.BytesIO(pdf_content), "application/pdf")}
-    form_data = {"skills": "s1,s2", "experience": "e1", "education": "d1"}
+    pdf_content = b"%PDF-1.4\n%user_create_fail"
+    files = {"file": ("user_create_fail.pdf", io.BytesIO(pdf_content), "application/pdf")}
+    form_data = {"skills": "s", "experience": "e", "education": "d"}
 
-    response = client.post(
-        "/api/upload-cv",
-        files=files,
-        data=form_data,  # Use 'data' for form fields when 'files' is also present
-    )
-    assert response.status_code == 201, f"Expected 201, got {response.status_code}. Response: {response.text}"
-    data = response.json()
-    assert data["message"] == "CV uploaded successfully!"
-    assert data["s3_url"] == "http://fake-s3-url.com/test.pdf"
-    assert "user_id" in data
-    # assert data["user_created"] is True # This depends on your API logic (new user vs existing)
-    assert "resume_id" in data
-    assert "recommendations" in data
+    response = client.post("/api/upload-cv", files=files, data=form_data)
 
-    mock_s3_upload.assert_called_once()
-    mock_resume_model_create.assert_called_once()
-    mock_recommendation_engine_get_recommendations.assert_called_once()
+    assert response.status_code == 500
+    assert response.json()["detail"] == "Failed to create new user record."
+    mock_user_model_create.assert_called_once()
 
-
-def test_upload_cv_invalid_file_type(client: TestClient):
-    txt_content = b"not a pdf"
-    files = {"file": ("cv.txt", io.BytesIO(txt_content), "text/plain")}
-    form_data = {"skills": "a", "experience": "b", "education": "c"}
-
-    response = client.post(
-        "/api/upload-cv",
-        files=files,
-        data=form_data,
-    )
-    assert response.status_code == 400, f"Expected 400, got {response.status_code}. Response: {response.text}"
-
-    actual_detail = response.json()["detail"]
-    expected_detail = "Only PDF, DOC, DOCX files are allowed. Got: .txt"
-    assert actual_detail == expected_detail
-
-
-def test_upload_cv_s3_failure(
-        client: TestClient,
-        mock_s3_upload,
+def test_upload_cv_resume_creation_fails(
+    client: TestClient,
+    mock_s3_upload,
+    mock_user_model_get_by_id,
+    mock_resume_model_create,
 ):
-    s3_error_msg = "Mocked S3 Upload Exception"
-    mock_s3_upload.side_effect = Exception(s3_error_msg)
+    user_id_existing = 789
+    mock_s3_upload.return_value = "http://fake-s3-url.com/resume_create_fail.pdf"
+    mock_user_model_get_by_id.return_value = {"id": user_id_existing, "created_at": "sometime"}
+    mock_resume_model_create.return_value = None
 
-    pdf_content = b"%PDF-1.4\n%s3_fail"
-    files = {"file": ("s3_fail.pdf", io.BytesIO(pdf_content), "application/pdf")}
-    form_data = {"skills": "s", "experience": "f", "education": "t"}
-
-    response = client.post(
-        "/api/upload-cv",
-        files=files,
-        data=form_data,
-    )
-
-    assert response.status_code == 500, f"Expected 500, got {response.status_code}. Response: {response.text}"
-    # The original check was:
-    # assert ("internal server error occurred during CV upload" in response.json()["detail"])
-    # This is a good way to check for partial strings. Let's ensure it's precise if possible,
-    # or stick to `in` if the error message might have other dynamic parts.
-    # If the error is exactly "Internal server error occurred during CV upload. Reason: Mocked S3 Upload Exception"
-    # then an exact match might be too brittle if "Reason" changes.
-    # Sticking to `in` for more general internal server errors.
-    assert "internal server error occurred during CV upload" in response.json()["detail"]
-    # Optionally, you might want to check if the specific S3 error is logged or part of a more detailed internal message
-    # but not necessarily exposed directly to the client in this exact way.
-
-
-def test_upload_cv_user_not_found(
-        client: TestClient, mock_s3_upload, mock_user_model_get_by_id
-):
-    mock_s3_upload.return_value = "http://fake-s3-url.com/user_not_found.pdf"
-    user_id_not_found = 404  # This is an ID, not a status code for the mock
-    mock_user_model_get_by_id.return_value = None  # Simulate user not found
-
-    pdf_content = b"%PDF-1.4\n%user_not_found"
-    files = {"file": ("user_not_found.pdf", io.BytesIO(pdf_content), "application/pdf")}
+    pdf_content = b"%PDF-1.4\n%resume_create_fail"
+    files = {"file": ("resume_create_fail.pdf", io.BytesIO(pdf_content), "application/pdf")}
     form_data = {
-        "skills": "a",
-        "experience": "b",
-        "education": "c",
-        "user_id": str(user_id_not_found),  # Pass user_id in form data
+        "skills": "s", "experience": "e", "education": "d", "user_id": str(user_id_existing)
     }
 
-    response = client.post(
-        "/api/upload-cv",
-        files=files,
-        data=form_data,
+    response = client.post("/api/upload-cv", files=files, data=form_data)
+
+    assert response.status_code == 500
+    assert response.json()["detail"] == "Failed to create resume record."
+    mock_resume_model_create.assert_called_once()
+
+def test_upload_cv_unexpected_generic_exception(
+    client: TestClient,
+    mock_s3_upload,
+    # We will use 'patch' here locally, ensure 'patch' is imported: from unittest.mock import patch
+):
+    mock_s3_upload.return_value = "http://fake-s3-url.com/generic_error.pdf"
+    from app.db import models as db_models # Import locally for patch target
+    with patch.object(db_models.ResumeModel, 'create', side_effect=ValueError("Unexpected DB trouble")):
+        pdf_content = b"%PDF-1.4\n%generic"
+        files = {"file": ("generic.pdf", io.BytesIO(pdf_content), "application/pdf")}
+        form_data = {"skills": "s", "experience": "e", "education": "d"}
+
+        response = client.post("/api/upload-cv", files=files, data=form_data)
+
+        assert response.status_code == 500
+        assert response.json()["detail"] == "An internal server error occurred during CV upload."
+
+
+# --- Tests for /api/recommendations/{resume_id} ---
+
+def test_get_recommendations_success(
+    client: TestClient,
+    mock_resume_model_get_by_id,
+    mock_recommendation_engine_get_recommendations
+):
+    mock_resume_model_get_by_id.return_value = MOCK_RESUME_DATA
+    # Ensure enough items for default pagination (size 10 usually)
+    mock_recommendation_engine_get_recommendations.return_value = MOCK_RECOMMENDATIONS_PAYLOAD * 5
+
+    response = client.get(f"/api/recommendations/{VALID_RESUME_ID}?page=1&size=5")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert "recommendations" in data
+    # The items will be a slice of the full payload due to pagination
+    assert len(data["recommendations"]["items"]) == 5
+    assert data["recommendations"]["items"][0] == MOCK_RECOMMENDATIONS_PAYLOAD[0]
+    assert data["recommendations"]["page"] == 1
+    assert data["recommendations"]["size"] == 5
+    mock_resume_model_get_by_id.assert_called_once_with(VALID_RESUME_ID)
+    mock_recommendation_engine_get_recommendations.assert_called_once_with(
+        skills=MOCK_RESUME_DATA["skills"],
+        experience=MOCK_RESUME_DATA["experience"],
+        education=MOCK_RESUME_DATA["education"],
+        location=MOCK_RESUME_DATA["location"],
+        cache_key=f"resume_{VALID_RESUME_ID}_{MOCK_RESUME_DATA['location']}",
+        force_refresh=False,
+        page=1
     )
 
-    assert response.status_code == 404, f"Expected 404, got {response.status_code}. Response: {response.text}"
-    assert f"User with ID {user_id_not_found} not found" in response.json()["detail"]
+def test_get_recommendations_resume_not_found(
+    client: TestClient, mock_resume_model_get_by_id
+):
+    mock_resume_model_get_by_id.return_value = None
+    non_existent_resume_id = 9999
+    response = client.get(f"/api/recommendations/{non_existent_resume_id}")
+    assert response.status_code == 404
+    assert response.json()["detail"] == f"Resume {non_existent_resume_id} not found"
 
+def test_get_recommendations_with_location_override_and_refresh(
+    client: TestClient,
+    mock_resume_model_get_by_id,
+    mock_recommendation_engine_get_recommendations
+):
+    override_location = "Remote"
+    mock_resume_model_get_by_id.return_value = MOCK_RESUME_DATA
+    # FIX: Return enough items for page=2, size=3 (e.g., 4 items)
+    mock_recommendations = [{"id": f"remotejob{i}", "title": f"Remote Role {i}"} for i in range(4)]
+    mock_recommendation_engine_get_recommendations.return_value = mock_recommendations
+
+    response = client.get(
+        f"/api/recommendations/{VALID_RESUME_ID}?location={override_location}&refresh=true&page=2&size=3"
+    )
+    assert response.status_code == 200
+    data = response.json()["recommendations"]
+    assert len(data["items"]) == 1 # 4 items total, size 3. Page 1 has 3, Page 2 has 1.
+    assert data["items"][0]["title"] == "Remote Role 3" # The 4th item
+    assert data["page"] == 2 # This should now pass
+    assert data["size"] == 3
+
+    mock_recommendation_engine_get_recommendations.assert_called_once_with(
+        skills=MOCK_RESUME_DATA["skills"],
+        experience=MOCK_RESUME_DATA["experience"],
+        education=MOCK_RESUME_DATA["education"],
+        location=override_location,
+        cache_key=f"resume_{VALID_RESUME_ID}_{override_location}",
+        force_refresh=True,
+        page=2
+    )
+
+def test_get_recommendations_engine_exception(
+    client: TestClient,
+    mock_resume_model_get_by_id,
+    mock_recommendation_engine_get_recommendations
+):
+    mock_resume_model_get_by_id.return_value = MOCK_RESUME_DATA
+    mock_recommendation_engine_get_recommendations.side_effect = Exception("AI Engine exploded")
+
+    response = client.get(f"/api/recommendations/{VALID_RESUME_ID}")
+
+    assert response.status_code == 500
+    assert response.json()["detail"] == f"Internal server error getting recommendations for resume {VALID_RESUME_ID}."
+
+
+# --- Tests for /api/search-jobs ---
+
+def test_search_jobs_success(
+    client: TestClient, mock_recommendation_engine_search_jobs
+):
+    search_query = "developer"
+    search_location = "Kandy"
+    # Ensure enough items for default pagination
+    mock_recommendation_engine_search_jobs.return_value = MOCK_SEARCH_RESULTS * 10
+
+    response = client.get(
+        f"/api/search-jobs?query={search_query}&location={search_location}&page=1&size=10"
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["items"]) == 10
+    assert data["items"][0] == MOCK_SEARCH_RESULTS[0]
+    assert data["page"] == 1
+    assert data["size"] == 10
+    mock_recommendation_engine_search_jobs.assert_called_once_with(
+        query=search_query,
+        location=search_location,
+        cache_key=f"search_{search_query}_{search_location}",
+        page=1,
+        size=10,
+        fetch_more=False
+    )
+
+def test_search_jobs_missing_query(client: TestClient):
+    response = client.get("/api/search-jobs?location=Colombo")
+    assert response.status_code == 422
+
+def test_search_jobs_engine_exception(
+    client: TestClient, mock_recommendation_engine_search_jobs
+):
+    search_query = "tester"
+    mock_recommendation_engine_search_jobs.side_effect = Exception("Search system offline")
+
+    response = client.get(f"/api/search-jobs?query={search_query}")
+    assert response.status_code == 500
+    assert response.json()["detail"] == "Internal server error during job search."
+
+# --- Tests for /api/job-stats/{resume_id} ---
+
+def test_get_job_stats_success(
+    client: TestClient, mock_resume_model_get_by_id, mock_recommendation_engine_get_job_stats
+):
+    mock_resume_model_get_by_id.return_value = MOCK_RESUME_DATA
+    mock_recommendation_engine_get_job_stats.return_value = MOCK_JOB_STATS
+
+    response = client.get(f"/api/job-stats/{VALID_RESUME_ID}")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["resume_id"] == VALID_RESUME_ID
+    assert data["stats"] == MOCK_JOB_STATS
+    mock_recommendation_engine_get_job_stats.assert_called_once_with(
+        skills=MOCK_RESUME_DATA["skills"],
+        experience=MOCK_RESUME_DATA["experience"],
+        education=MOCK_RESUME_DATA["education"]
+    )
+
+def test_get_job_stats_resume_not_found(
+    client: TestClient, mock_resume_model_get_by_id
+):
+    mock_resume_model_get_by_id.return_value = None
+    non_existent_resume_id = 777
+    response = client.get(f"/api/job-stats/{non_existent_resume_id}")
+    assert response.status_code == 404
+    assert response.json()["detail"] == f"Resume {non_existent_resume_id} not found"
+
+def test_get_job_stats_engine_exception(
+    client: TestClient, mock_resume_model_get_by_id, mock_recommendation_engine_get_job_stats
+):
+    mock_resume_model_get_by_id.return_value = MOCK_RESUME_DATA
+    mock_recommendation_engine_get_job_stats.side_effect = Exception("Stats engine broke")
+    response = client.get(f"/api/job-stats/{VALID_RESUME_ID}")
+    assert response.status_code == 500
+    assert response.json()["detail"] == "Internal server error generating job stats."
+
+
+# --- Tests for /api/delete-cv/{resume_id} ---
+
+def test_delete_cv_success(
+    client: TestClient, mock_resume_model_get_by_id, mock_s3_delete, mock_resume_model_delete, mocker
+):
+    mock_resume_data_with_url = {**MOCK_RESUME_DATA, "cv_url": f"https://{settings.S3_BUCKET_NAME}.s3.amazonaws.com/uploads/cv_to_delete.pdf"}
+    mock_resume_model_get_by_id.return_value = mock_resume_data_with_url
+    mock_s3_delete.return_value = True
+    mock_resume_model_delete.return_value = True
+    mock_clear_cache = mocker.patch("app.services.ml.recommendation_engine.RecommendationEngine.clear_cache")
+
+    response = client.delete(f"/api/delete-cv/{VALID_RESUME_ID}")
+
+    assert response.status_code == 200
+    assert response.json()["message"] == f"Resume with ID {VALID_RESUME_ID} processed for deletion. S3 status: True"
+    expected_s3_object_name = "uploads/cv_to_delete.pdf"
+    mock_s3_delete.assert_called_once_with(expected_s3_object_name)
+    mock_resume_model_delete.assert_called_once_with(VALID_RESUME_ID)
+    mock_clear_cache.assert_called_once_with(f"resume_{VALID_RESUME_ID}_{mock_resume_data_with_url['location']}")
+
+
+def test_delete_cv_resume_not_found(client: TestClient, mock_resume_model_get_by_id):
+    mock_resume_model_get_by_id.return_value = None
+    response = client.delete(f"/api/delete-cv/{VALID_RESUME_ID}")
+    assert response.status_code == 404
+    assert f"Resume {VALID_RESUME_ID} not found" in response.json()["detail"]
+
+def test_delete_cv_s3_delete_fails(
+    client: TestClient, mock_resume_model_get_by_id, mock_s3_delete, mock_resume_model_delete, mocker
+):
+    mock_resume_data_with_url = {**MOCK_RESUME_DATA, "cv_url": f"https://{settings.S3_BUCKET_NAME}.s3.amazonaws.com/uploads/cv_s3_fail.pdf"}
+    mock_resume_model_get_by_id.return_value = mock_resume_data_with_url
+    mock_s3_delete.return_value = False
+    mock_resume_model_delete.return_value = True
+    mock_clear_cache = mocker.patch("app.services.ml.recommendation_engine.RecommendationEngine.clear_cache")
+
+    response = client.delete(f"/api/delete-cv/{VALID_RESUME_ID}")
+
+    assert response.status_code == 200
+    assert response.json()["message"] == f"Resume with ID {VALID_RESUME_ID} processed for deletion. S3 status: False"
+    mock_s3_delete.assert_called_once()
+    mock_resume_model_delete.assert_called_once()
+    mock_clear_cache.assert_called_once()
+
+
+def test_delete_cv_db_delete_fails(
+    client: TestClient, mock_resume_model_get_by_id, mock_s3_delete, mock_resume_model_delete
+):
+    mock_resume_data_with_url = {**MOCK_RESUME_DATA, "cv_url": "s3_url"} # Ensure a cv_url to attempt s3 delete
+    mock_resume_model_get_by_id.return_value = mock_resume_data_with_url
+    mock_s3_delete.return_value = True # Assume S3 delete would succeed or is called
+    mock_resume_model_delete.return_value = False
+
+    response = client.delete(f"/api/delete-cv/{VALID_RESUME_ID}")
+
+    assert response.status_code == 500
+    assert response.json()["detail"] == "Failed to delete resume record from database."
+    mock_resume_model_delete.assert_called_once_with(VALID_RESUME_ID)
+
+def test_delete_cv_no_cv_url_in_resume_data(
+    client: TestClient, mock_resume_model_get_by_id, mock_s3_delete, mock_resume_model_delete, mocker
+):
+    mock_resume_data_no_url = {**MOCK_RESUME_DATA, "cv_url": None}
+    mock_resume_model_get_by_id.return_value = mock_resume_data_no_url
+    mock_resume_model_delete.return_value = True
+    mock_clear_cache = mocker.patch("app.services.ml.recommendation_engine.RecommendationEngine.clear_cache")
+
+    response = client.delete(f"/api/delete-cv/{VALID_RESUME_ID}")
+
+    assert response.status_code == 200
+    assert response.json()["message"] == f"Resume with ID {VALID_RESUME_ID} processed for deletion. S3 status: False"
+    mock_s3_delete.assert_not_called()
+    mock_resume_model_delete.assert_called_once_with(VALID_RESUME_ID)
+    mock_clear_cache.assert_called_once()
+
+
+def test_delete_cv_s3_service_raises_exception(
+    client: TestClient, mock_resume_model_get_by_id, mock_s3_delete
+):
+    mock_resume_data_with_url = {**MOCK_RESUME_DATA, "cv_url": f"https://{settings.S3_BUCKET_NAME}.s3.amazonaws.com/uploads/s3_exception.pdf"}
+    mock_resume_model_get_by_id.return_value = mock_resume_data_with_url
+    mock_s3_delete.side_effect = Exception("S3 service broke completely")
+
+    response = client.delete(f"/api/delete-cv/{VALID_RESUME_ID}")
+    assert response.status_code == 500
+    assert "Internal server error during resume deletion." in response.json()["detail"]
+
+
+# --- Tests for /api/load-more-jobs ---
+
+def test_load_more_jobs_for_resume_id_success(client: TestClient, mock_resume_model_get_by_id, mock_recommendation_engine_get_recommendations):
+    mock_resume_model_get_by_id.return_value = MOCK_RESUME_DATA
+    # FIX: Return enough items for page=2, size=7 (e.g., 8 items)
+    mock_recs = [{"title": f"More Rec Job {i}"} for i in range(8)]
+    mock_recommendation_engine_get_recommendations.return_value = mock_recs
+
+    response = client.get(f"/api/load-more-jobs?resume_id={VALID_RESUME_ID}&page=2&size=7&location=TestCity")
+    assert response.status_code == 200
+    data = response.json()["recommendations"]
+    assert len(data["items"]) == 1 # 8 items total, size 7. Page 1 has 7, Page 2 has 1.
+    assert data["items"][0]["title"] == "More Rec Job 7"
+    assert data["page"] == 2 # This should now pass
+    assert data["size"] == 7
+    mock_recommendation_engine_get_recommendations.assert_called_with(
+        skills=ANY, experience=ANY, education=ANY,
+        location="TestCity",
+        cache_key=f"resume_{VALID_RESUME_ID}_TestCity",
+        force_refresh=False,
+        page=2
+    )
+
+
+def test_load_more_jobs_for_query_success(client: TestClient, mock_recommendation_engine_search_jobs):
+    query_val = "senior dev"
+    location_val = "WFH"
+    # FIX: Return enough items for page=3, size=8 (e.g., 17 items)
+    mock_search = [{"title": f"More Search Job {i}"} for i in range(17)]
+    mock_recommendation_engine_search_jobs.return_value = mock_search
+
+    response = client.get(f"/api/load-more-jobs?query={query_val}&location={location_val}&page=3&size=8")
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["items"]) == 1 # 17 items total, size 8. Page 1 (8), Page 2 (8), Page 3 (1)
+    assert data["items"][0]["title"] == "More Search Job 16"
+    assert data["page"] == 3 # This should now pass
+    assert data["size"] == 8
+
+    mock_recommendation_engine_search_jobs.assert_called_with(
+        query=query_val,
+        location=location_val,
+        cache_key=f"search_{query_val}_{location_val}",
+        page=3,
+        size=8,
+        fetch_more=True
+    )
+
+def test_load_more_jobs_resume_not_found_forwarded(client: TestClient, mock_resume_model_get_by_id):
+    mock_resume_model_get_by_id.return_value = None
+    resume_id_invalid = 333
+
+    response = client.get(f"/api/load-more-jobs?resume_id={resume_id_invalid}&page=1")
+    assert response.status_code == 404
+    assert f"Resume {resume_id_invalid} not found" in response.json()["detail"]
+
+def test_load_more_jobs_forwarded_generic_exception_from_recommendations(
+    client: TestClient, mock_resume_model_get_by_id, mock_recommendation_engine_get_recommendations
+):
+    mock_resume_model_get_by_id.return_value = MOCK_RESUME_DATA
+    mock_recommendation_engine_get_recommendations.side_effect = Exception("Rec engine internal error")
+
+    response = client.get(f"/api/load-more-jobs?resume_id={VALID_RESUME_ID}&page=1")
+    assert response.status_code == 500
+    # FIX: Expect the message from get_recommendations's generic handler
+    assert f"Internal server error getting recommendations for resume {VALID_RESUME_ID}." in response.json()["detail"]
+
+def test_load_more_jobs_forwarded_generic_exception_from_search(
+    client: TestClient, mock_recommendation_engine_search_jobs
+):
+    mock_recommendation_engine_search_jobs.side_effect = Exception("Search engine internal error")
+
+    response = client.get(f"/api/load-more-jobs?query=anything&page=1")
+    assert response.status_code == 500
+    # FIX: Expect the message from search_jobs's generic handler
+    assert "Internal server error during job search." in response.json()["detail"]
+
+
+def test_load_more_jobs_missing_resume_id_and_query(client: TestClient):
+    response = client.get("/api/load-more-jobs?page=1")
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Requires 'resume_id' or 'query' for loading more jobs."

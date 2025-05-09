@@ -12,7 +12,7 @@ class JobAPIService:
         keywords: Optional[List[str]] = None,
         location: Optional[str] = None,
         limit: int = 50,
-        page: int = 1,
+        page: int = 5,
     ) -> List[Dict[str, Any]]:
         api_key = None
         try:

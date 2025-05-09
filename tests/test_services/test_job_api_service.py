@@ -1,6 +1,3 @@
-# tests/test_services/test_job_api_service.py
-
-# import pytest # Removed F401
 from app.services.job_api_service import JobAPIService
 import requests
 from unittest.mock import MagicMock
@@ -57,5 +54,3 @@ class TestJobAPIService:
         processed = JobAPIService._process_jooble_response(api_response)
         assert len(processed) == 1
         assert processed[0]["id"] == "v1"
-
-    # Other tests...

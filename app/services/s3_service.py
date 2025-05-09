@@ -26,10 +26,8 @@ class S3Service:
         if object_name is None:
             object_name = file_obj.filename
 
-        # Create a prefix for better organization
         object_name = f"uploads/{object_name}"
 
-        # Create S3 client
         s3 = boto3.client(
             "s3",
             aws_access_key_id=AWS_ACCESS_KEY,
@@ -38,13 +36,10 @@ class S3Service:
         )
 
         try:
-            # Reset file position to beginning before uploading
             file_obj.file.seek(0)
 
-            # Upload the file
             s3.upload_fileobj(file_obj.file, S3_BUCKET_NAME, object_name)
 
-            # Generate and return the URL
             s3_url = f"https://{S3_BUCKET_NAME}.s3.amazonaws.com/{object_name}"
             return s3_url
         except NoCredentialsError:

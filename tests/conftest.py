@@ -1,27 +1,22 @@
-# tests/conftest.py
-
 import sys
 import os
 import pytest
-from fastapi.testclient import TestClient  # Import TestClient
-import psycopg2  # Optional: For real test DB fixtures
-from psycopg2.extras import RealDictCursor  # Optional
+from fastapi.testclient import TestClient
+import psycopg2
+from psycopg2.extras import RealDictCursor
 
-# --- Add project root to sys.path ---
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 print(f"Project root added to sys.path in conftest: {PROJECT_ROOT}")
 
-# --- Attempt to import the FastAPI app instance ---
 try:
-    # Adjust this import based on where your FastAPI 'app' instance is defined
     from app.main import app
 
     print("Successfully imported 'app' from app.main for conftest")
 except ImportError as e_app_main:
     try:
-        from main import app  # If app is in project_root/main.py
+        from main import app
 
         print("Successfully imported 'app' from main (project root) for conftest")
     except ImportError as e_main:
@@ -30,7 +25,6 @@ except ImportError as e_app_main:
             f"CRITICAL WARNING (conftest.py): FastAPI 'app' instance could not be imported. Error for 'app.main': {e_app_main}. Error for 'main': {e_main}. Client-dependent tests will be skipped."
         )
 
-# --- Optional: Database settings for Test Database ---
 try:
     from app.config.settings import (
         DB_HOST as TEST_DB_HOST,
@@ -51,15 +45,13 @@ except ImportError:
     TEST_DB_PORT = os.getenv("TEST_DB_PORT", "5432")
     TEST_DB_NAME = os.getenv(
         "TEST_DB_NAME", "test_db_placeholder"
-    )  # Use a specific test DB name
+    )
     TEST_DB_USER = os.getenv("TEST_DB_USER", "test_user_placeholder")
     TEST_DB_PASSWORD = os.getenv("TEST_DB_PASSWORD", "test_password_placeholder")
 
 
-# --- Optional: Fixture for a real test database connection ---
 @pytest.fixture(scope="session")
 def test_db_connection():
-    # (Implementation remains the same as previous version - handles connection/skipping)
     conn = None
     try:
         conn = psycopg2.connect(
@@ -78,12 +70,12 @@ def test_db_connection():
         create_tables(conn)
     except Exception as e:
         if conn:
-            conn.close()  # <--- E701 හදපු ලයින් එක (කලින්: if conn: conn.close())
+            conn.close()
         pytest.skip(f"Table creation in test DB ('{TEST_DB_NAME}') failed: {e}.")
         return None
     yield conn
     if conn:
-        conn.close()  # <--- E701 හදපු ලයින් එක (කලින්: if conn: conn.close())
+        conn.close()
 
 
 @pytest.fixture(scope="function")
@@ -107,12 +99,9 @@ def client():
             "FastAPI 'app' instance not loaded. Skipping client-dependent tests."
         )
 
-    # Initialize TestClient with the app instance as the first argument
     with TestClient(app) as test_client:
         yield test_client
 
-
-# --- Mocking Fixtures (Remain the same as previous version) ---
 @pytest.fixture
 def mock_s3_upload(mocker):
     return mocker.patch(

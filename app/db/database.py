@@ -1,15 +1,9 @@
-# app/db/database.py
-
 import psycopg2
 
-# from psycopg2.extras import RealDictCursor # Removed as unused in this file
-# Import settings safely
 try:
     from app.config.settings import DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD
 except ImportError:
-    # Provide fallbacks or raise a configuration error if settings are crucial
     print("CRITICAL: Failed to import database settings from app.config.settings!")
-    # Define fallbacks if needed for the code to run, though connection will likely fail
     DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD = None, None, None, None, None
 
 import logging
@@ -20,7 +14,7 @@ logger = logging.getLogger(__name__)
 def get_db_connection():
     """Create and return a new connection to the PostgreSQL database."""
     connection = None
-    # Check if settings were loaded
+
     if not all([DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD]):
         logger.error(
             "Database connection cannot be established: Configuration is missing."
@@ -41,7 +35,7 @@ def get_db_connection():
         return connection
     except psycopg2.OperationalError as e:
         logger.error(f"Database connection failed: {e}", exc_info=True)
-        raise  # Re-raise to signal connection failure clearly
+        raise
     except Exception as e:
         logger.error(f"Unexpected error during database connection: {e}", exc_info=True)
         raise
@@ -51,18 +45,16 @@ def init_db():
     """Initialize database by creating necessary tables if they don't exist."""
     conn = None
     try:
-        conn = get_db_connection()  # Attempt to connect
+        conn = get_db_connection()
         if conn:
-            create_tables(conn)  # Pass the connection to create_tables
+            create_tables(conn)
             logger.info("Database tables structure verified/initialized.")
-        # else case handled by get_db_connection raising an error
     except Exception as e:
-        # Catch errors from get_db_connection or create_tables
         logger.error(f"Database initialization failed: {e}", exc_info=True)
     finally:
         if (
             conn and not conn.closed
-        ):  # Check if connection exists and is not already closed
+        ):
             conn.close()
             logger.debug("Database connection closed after init_db.")
 
@@ -125,10 +117,10 @@ def create_tables(conn):
         logger.info("Database tables and indexes are ready.")
     except Exception as e:
         logger.error(f"Error during table/index creation: {e}", exc_info=True)
-        if conn and not conn.closed:  # Check before rollback
+        if conn and not conn.closed:
             try:
                 conn.rollback()
                 logger.info("Rolled back transaction due to table creation error.")
             except Exception as rb_e:
                 logger.error(f"Error during rollback: {rb_e}")
-        raise  # Re-raise error after attempting rollback
+        raise

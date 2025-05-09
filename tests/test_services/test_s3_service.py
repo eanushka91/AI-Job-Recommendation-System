@@ -1,5 +1,5 @@
 import boto3
-from botocore.exceptions import NoCredentialsError, ClientError  # Added ClientError
+from botocore.exceptions import NoCredentialsError, ClientError
 from app.config.settings import (
     AWS_ACCESS_KEY,
     AWS_SECRET_KEY,
@@ -26,10 +26,7 @@ class S3Service:
         if object_name is None:
             object_name = file_obj.filename
 
-        # Create a prefix for better organization
         object_name = f"uploads/{object_name}"
-
-        # Create S3 client
         s3 = boto3.client(
             "s3",
             aws_access_key_id=AWS_ACCESS_KEY,
@@ -38,19 +35,12 @@ class S3Service:
         )
 
         try:
-            # Reset file position to beginning before uploading
             file_obj.file.seek(0)
-
-            # Upload the file
             s3.upload_fileobj(file_obj.file, S3_BUCKET_NAME, object_name)
 
-            # Generate and return the URL
             s3_url = f"https://{S3_BUCKET_NAME}.s3.amazonaws.com/{object_name}"
             return s3_url
         except NoCredentialsError:
-            # It's good practice to raise the specific error or a custom one
-            # For now, following the original pattern of raising a generic Exception
-            # but logging the specific cause.
             print("S3 Upload Error: AWS credentials not available")
             raise Exception("AWS credentials not available")
         except Exception as e:
@@ -99,10 +89,8 @@ class S3Service:
             return True
         except NoCredentialsError:
             print("S3 Delete Error: AWS credentials not available.")
-            return False  # Silently return False as per discussion for routes
+            return False
         except ClientError as e:
-            # Handles S3-specific errors. delete_object usually doesn't error for "NoSuchKey".
-            # But other errors like "AccessDenied" could occur.
             error_code = e.response.get("Error", {}).get("Code")
             print(
                 f"S3 Delete Error (ClientError): Code: {error_code}, Message: {str(e)}"

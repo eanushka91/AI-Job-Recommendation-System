@@ -1,9 +1,6 @@
 import requests
 from typing import List, Dict, Any, Optional
 
-# JOOBLE_API_KEY is now imported dynamically and more safely inside fetch_jobs
-
-
 class JobAPIService:
     """Service for fetching real-time job listings from Jooble API"""
 
@@ -18,13 +15,11 @@ class JobAPIService:
     ) -> List[Dict[str, Any]]:
         api_key = None
         try:
-            # Try to import at the point of use to ensure mocks are effective
-            # and to handle potential circular dependencies or late configurations.
-            from app.config import settings as app_settings  # Import the module
+            from app.config import settings as app_settings
 
             api_key = getattr(
                 app_settings, "JOOBLE_API_KEY", None
-            )  # Safely get the attribute
+            )
         except ImportError:
             print(
                 "Critical Error: app.config.settings module could not be imported in JobAPIService."
@@ -100,9 +95,9 @@ class JobAPIService:
             print("JobAPIService Process Error: API response is not a dictionary.")
             return []
 
-        jobs_list = api_response.get("jobs")  # Use .get for safer access
+        jobs_list = api_response.get("jobs")
 
-        if not isinstance(jobs_list, list):  # Check if 'jobs' is a list
+        if not isinstance(jobs_list, list):
             print(
                 f"JobAPIService Process Error: 'jobs' key is missing or not a list in API response. Found: {type(jobs_list)}"
             )
@@ -111,13 +106,12 @@ class JobAPIService:
         for job_data in jobs_list:
             if not isinstance(
                 job_data, dict
-            ):  # Ensure each item in jobs_list is a dict
+            ):
                 print(
                     f"JobAPIService Process Warning: Skipping non-dictionary job item: {job_data}"
                 )
-                continue  # Skip this item and proceed with the next
+                continue
 
-            # Safely get data using .get() with defaults
             job_id = job_data.get("id", "")
             title = job_data.get("title", "Unknown Position")
             company = job_data.get("company", "Unknown Company")

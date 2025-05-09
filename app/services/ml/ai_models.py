@@ -1,10 +1,7 @@
-# app/services/ml/ai_models.py
-
 from sklearn.feature_extraction.text import TfidfVectorizer
 from app.db.database import get_db_connection
 from psycopg2.extras import RealDictCursor
 
-# Removed Optional as unused based on previous Ruff report
 from typing import List, Dict, Any
 from datetime import datetime
 from pydantic import BaseModel
@@ -92,9 +89,9 @@ class JobRecommendationModel:
             logger.exception(
                 f"Error saving recommendations for resume_id {resume_id}: {e}"
             )
-            if conn and not conn.closed:  # Check before rollback
+            if conn and not conn.closed:
                 try:
-                    conn.rollback()  # Fixed E701
+                    conn.rollback()
                 except Exception as rb_e:
                     logger.error(f"Error during rollback: {rb_e}")
             return False
@@ -144,7 +141,7 @@ class JobRecommendationModel:
             return []
         finally:
             if conn and not conn.closed:
-                conn.close()  # Fixed E701
+                conn.close()
 
 
 class MLModelConfig(BaseModel):
@@ -198,8 +195,7 @@ class TrainedModel:
             logger.warning(
                 f"TrainedModel transform: Input text is empty or invalid type ({type(text)})."
             )
-            # Return empty sparse matrix or handle as needed
-            return self.vectorizer.transform([""])  # Transform empty string?
+            return self.vectorizer.transform([""])
         try:
             logger.debug(f"TrainedModel: Transforming text (length: {len(text)})...")
             vector = self.vectorizer.transform([text])
@@ -210,16 +206,3 @@ class TrainedModel:
         except Exception as e:
             logger.exception(f"TrainedModel transform: Error transforming text: {e}")
             raise
-
-
-# Ensure E701 is fixed: Check line 62 in your original file.
-# If it looked like `if condition: statement`, change it to:
-# if condition:
-#     statement
-# Apply similar fixes for other E701 errors reported (lines 72, 75, 108)
-# Example fix for line 72 (assuming it was `if conn: conn.rollback()`):
-# if conn:
-#     conn.rollback()
-# Example fix for line 108 (assuming it was `if conn: conn.close()`):
-# if conn:
-#     conn.close()

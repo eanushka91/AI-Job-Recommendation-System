@@ -1,9 +1,5 @@
-# app/db/models.py
-
 from app.db.database import get_db_connection
 from psycopg2.extras import RealDictCursor
-
-# Removed Optional as unused based on previous Ruff report
 from typing import List, Dict, Any
 import logging
 
@@ -26,7 +22,7 @@ class UserModel:
                 cur.execute("INSERT INTO users DEFAULT VALUES RETURNING id")
                 result = cur.fetchone()
                 if result:
-                    user_id = result[0]  # Fixed E701: Assignment on new line
+                    user_id = result[0]
                 conn.commit()
                 if user_id is None:
                     logger.error("Failed to retrieve user ID after insert.")
@@ -36,11 +32,11 @@ class UserModel:
         except Exception as e:
             logger.exception(f"Error creating user: {e}")
             if conn:
-                conn.rollback()  # Fixed E701: Call on new line
+                conn.rollback()
             return None
         finally:
             if conn:
-                conn.close()  # Fixed E701: Call on new line
+                conn.close()
 
     @staticmethod
     def get_by_id(user_id: int) -> Dict[str, Any] | None:
@@ -64,7 +60,7 @@ class UserModel:
             return None
         finally:
             if conn:
-                conn.close()  # Fixed E701: Call on new line
+                conn.close()
 
 
 class ResumeModel:
@@ -77,6 +73,7 @@ class ResumeModel:
         skills: List[str],
         experience: List[str],
         education: List[str],
+        location: str | None = None, # <<< Location parameter එක add කරා
     ) -> int | None:
         """Create a new resume entry in the database, return ID or None."""
         conn = None
@@ -86,17 +83,18 @@ class ResumeModel:
             if not conn:
                 raise Exception("Failed to get DB connection")
             with conn.cursor() as cur:
-                cur.execute(
-                    """
-                    INSERT INTO resumes (user_id, cv_url, skills, experience, education)
-                    VALUES (%s, %s, %s::TEXT[], %s::TEXT[], %s::TEXT[])
+                sql_query = """
+                    INSERT INTO resumes (user_id, cv_url, skills, experience, education, location)
+                    VALUES (%s, %s, %s::TEXT[], %s::TEXT[], %s::TEXT[], %s)
                     RETURNING id
-                    """,
-                    (user_id, cv_url, skills, experience, education),
+                """
+                cur.execute(
+                    sql_query,
+                    (user_id, cv_url, skills, experience, education, location), # <<< location එක query එකට දුන්නා
                 )
                 result = cur.fetchone()
                 if result:
-                    resume_id = result[0]  # Fixed E701: Assignment on new line
+                    resume_id = result[0]
                 conn.commit()
                 if resume_id is None:
                     logger.error(
@@ -104,17 +102,17 @@ class ResumeModel:
                     )
                     return None
                 logger.info(
-                    f"Created resume with ID: {resume_id} for user ID: {user_id}"
+                    f"Created resume with ID: {resume_id} for user ID: {user_id} with location: {location}"
                 )
                 return resume_id
         except Exception as e:
             logger.exception(f"Error creating resume for user {user_id}: {e}")
             if conn:
-                conn.rollback()  # Fixed E701: Call on new line
-            return None  # Return None instead of raising to allow caller to handle
+                conn.rollback()
+            return None
         finally:
             if conn:
-                conn.close()  # Fixed E701: Call on new line
+                conn.close()
 
     @staticmethod
     def get_by_id(resume_id: int) -> Dict[str, Any] | None:
@@ -142,7 +140,7 @@ class ResumeModel:
             return None
         finally:
             if conn:
-                conn.close()  # Fixed E701: Call on new line
+                conn.close()
 
     @staticmethod
     def get_by_user_id(user_id: int) -> List[Dict[str, Any]]:
@@ -168,7 +166,7 @@ class ResumeModel:
             return []
         finally:
             if conn:
-                conn.close()  # Fixed E701: Call on new line
+                conn.close()
 
     @staticmethod
     def delete(resume_id: int) -> bool:
@@ -195,11 +193,11 @@ class ResumeModel:
         except Exception as e:
             logger.exception(f"Error deleting resume ID {resume_id}: {e}")
             if conn:
-                conn.rollback()  # Fixed E701: Call on new line
+                conn.rollback()
             return False
         finally:
             if conn:
-                conn.close()  # Fixed E701: Call on new line
+                conn.close()
 
     @staticmethod
     def save_recommendations(
@@ -211,14 +209,10 @@ class ResumeModel:
             conn = get_db_connection()
             if not conn:
                 raise Exception("Failed to get DB connection")
-            # Ensure table exists (idempotent)
             with conn.cursor() as cur:
-                # (Assuming create_tables in init_db already handled table creation)
-                # Delete old recommendations first
                 cur.execute(
                     "DELETE FROM job_recommendations WHERE resume_id = %s", (resume_id,)
                 )
-            # Insert new ones
             with conn.cursor() as cur:
                 insert_query = """
                     INSERT INTO job_recommendations
@@ -256,11 +250,11 @@ class ResumeModel:
                 f"Error saving recommendations for resume {resume_id}: {e}"
             )
             if conn:
-                conn.rollback()  # Fixed E701: Call on new line
+                conn.rollback()
             return False
         finally:
             if conn:
-                conn.close()  # Fixed E701: Call on new line
+                conn.close()
 
     @staticmethod
     def get_recommendations(resume_id: int) -> List[Dict[str, Any]]:
@@ -289,4 +283,4 @@ class ResumeModel:
             return []
         finally:
             if conn:
-                conn.close()  # Fixed E701: Call on new line
+                conn.close()

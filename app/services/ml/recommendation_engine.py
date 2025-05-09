@@ -1,10 +1,8 @@
-# app/services/ml/recommendation_engine.py
-
 from typing import List, Dict, Any, Optional
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import requests
-import re  # Keep this import as it's used in get_job_stats
+import re
 import random
 import logging
 
@@ -18,7 +16,7 @@ class RecommendationEngine:
     _pagination_state: Dict[str, Dict[str, Any]] = {}
 
     JOOBLE_API_KEY_RE = (
-        "2b0875d1-df2c-45a7-a65b-ff28d3c3a624"  # Consider moving to settings
+        "70587e41-5ac1-49f7-a9e8-a388a12308dc"
     )
     JOOBLE_API_URL = "https://jooble.org/api/"
 
@@ -34,8 +32,7 @@ class RecommendationEngine:
         page: int = 1,
     ) -> List[Dict[str, Any]]:
         _experience = experience if experience is not None else []
-        # Fixed F541: Removed 'f' prefix if no placeholders were used
-        logger.info("RE: Getting recommendations...")  # Line 72 approx
+        logger.info("RE: Getting recommendations...")
 
         logger.info(
             f"RE Details: num={num_recommendations}, page={page}, refresh={force_refresh}, key={cache_key}"
@@ -264,7 +261,7 @@ class RecommendationEngine:
         page: int = 1,
     ) -> List[Dict[str, Any]]:
         if not RecommendationEngine.JOOBLE_API_KEY_RE:
-            logger.error("RE Jooble Fetch: API key not set.")  # Fixed E701
+            logger.error("RE Jooble Fetch: API key not set.")
             return []
         try:
             search_query_str = " ".join(filter(None, keywords))

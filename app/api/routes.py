@@ -1,40 +1,40 @@
-# app/api/routes.py
-
 from fastapi import APIRouter, File, UploadFile, Form, Query, HTTPException
-
-# from fastapi.responses import JSONResponse # Removed as unused in active code
-from typing import Optional
+from typing import Optional, List, TypeVar  # TypeVar එක import කරගන්න
 import logging
 
-# --- Application specific imports ---
 from app.services.s3_service import S3Service
 from app.services.ml.recommendation_engine import RecommendationEngine
 from app.db.models import ResumeModel, UserModel
-from app.config.settings import DEFAULT_RECOMMENDATIONS_COUNT, DEFAULT_JOB_LOCATION
-from app.api.pagination import PageParams, paginate, PageResponse
+from app.config.settings import DEFAULT_RECOMMENDATIONS_COUNT, DEFAULT_JOB_LOCATION, S3_BUCKET_NAME
+from app.api.pagination import PageParams, paginate, PageResponse, RecommendationsWrappedResponse
+
 
 logger = logging.getLogger(__name__)
-
 router = APIRouter(prefix="/api", tags=["CV Upload & Recommendations"])
 
-# --- Endpoint Definitions ---
+JobItemType = TypeVar("JobItemType")
+
 
 
 @router.post("/upload-cv", status_code=201)
 async def upload_cv(
-    file: UploadFile = File(..., description="CV file (PDF recommended)."),
-    skills: str = Form(..., description="Comma-separated skills."),
-    experience: str = Form(..., description="Comma-separated experience."),
-    education: str = Form(..., description="Comma-separated education."),
-    location: Optional[str] = Form(
-        DEFAULT_JOB_LOCATION, description="Optional job location."
-    ),
-    user_id: Optional[int] = Form(None, description="Optional existing user ID."),
+        file: UploadFile = File(..., description="CV file (PDF, DOC, DOCX)."),
+        skills: str = Form(""),
+        experience: str = Form(""),
+        education: str = Form(""),
+        location: Optional[str] = Form(DEFAULT_JOB_LOCATION),
+        user_id: Optional[int] = Form(None),
 ):
     logger.info(f"CV upload request for filename: {file.filename}")
-    if not file.filename or not file.filename.lower().endswith(".pdf"):
-        logger.warning(f"Invalid file type: {file.filename}")
-        raise HTTPException(status_code=400, detail="Only PDF files are allowed.")
+    allowed_extensions = {".pdf", ".doc", ".docx"}
+
+    file_ext = ""
+    if "." in file.filename:
+        file_ext = "." + file.filename.rsplit('.', 1)[1].lower()
+
+    if file_ext not in allowed_extensions:
+        logger.warning(f"Invalid file type: {file.filename} (ext: {file_ext})")
+        raise HTTPException(status_code=400, detail=f"Only PDF, DOC, DOCX files are allowed. Got: {file_ext}")
 
     try:
         s3_url = S3Service.upload_file(file, object_name=file.filename)
@@ -60,9 +60,14 @@ async def upload_cv(
                 )
             logger.debug(f"Found existing user: ID {db_user_id}")
 
-        skills_list = [s.strip() for s in skills.split(",") if s.strip()]
-        experience_list = [e.strip() for e in experience.split(",") if e.strip()]
-        education_list = [e.strip() for e in education.split(",") if e.strip()]
+        skills_list = [s.strip() for s in skills.split(",") if s.strip()] if skills else []
+        experience_list = [e.strip() for e in experience.split(";") if e.strip()] if experience else []
+        education_list = [e.strip() for e in education.split(";") if e.strip()] if education else []
+
+        logger.debug(f"Processed Skills: {skills_list}")
+        logger.debug(f"Processed Experience: {experience_list}")
+        logger.debug(f"Processed Education: {education_list}")
+        logger.debug(f"Processed Location: {location}")
 
         resume_id = ResumeModel.create(
             user_id=db_user_id,
@@ -70,27 +75,31 @@ async def upload_cv(
             skills=skills_list,
             experience=experience_list,
             education=education_list,
+            location=location,
         )
         if resume_id is None:
             raise HTTPException(
                 status_code=500, detail="Failed to create resume record."
             )
-        logger.info(f"Resume record created: ID {resume_id}")
+        logger.info(f"Resume record created: ID {resume_id} with location: {location}")
 
-        rec_cache_key = f"resume_{resume_id}_{location or 'default'}"
-        recommendations_list = RecommendationEngine.get_job_recommendations(
+        effective_location = location or DEFAULT_JOB_LOCATION
+        rec_cache_key = f"resume_{resume_id}_{effective_location}"
+
+        recommendations_data_list = RecommendationEngine.get_job_recommendations(
             skills=skills_list,
             experience=experience_list,
             education=education_list,
-            location=location,
+            location=effective_location,
             num_recommendations=DEFAULT_RECOMMENDATIONS_COUNT * 2,
             cache_key=rec_cache_key,
             force_refresh=True,
+            page=1
         )
-        logger.info(f"Fetched {len(recommendations_list)} potential recommendations.")
+        logger.info(f"Fetched {len(recommendations_data_list)} potential recommendations for initial display.")
 
         page_params = PageParams(page=1, size=DEFAULT_RECOMMENDATIONS_COUNT)
-        paginated_recommendations = paginate(recommendations_list, page_params)
+        paginated_recommendations_dict = paginate(recommendations_data_list, page_params)
 
         return {
             "message": "CV uploaded successfully!",
@@ -98,7 +107,7 @@ async def upload_cv(
             "user_id": db_user_id,
             "user_created": user_created,
             "resume_id": resume_id,
-            "recommendations": paginated_recommendations,
+            "recommendations": paginated_recommendations_dict,
         }
     except HTTPException as http_exc:
         raise http_exc
@@ -110,70 +119,84 @@ async def upload_cv(
         )
 
 
-@router.get("/recommendations/{resume_id}", response_model=PageResponse)
+@router.get("/recommendations/{resume_id}", response_model=RecommendationsWrappedResponse[JobItemType])
 async def get_recommendations(
-    resume_id: int,
-    location: Optional[str] = Query(None),
-    refresh: bool = Query(False),
-    page: int = Query(1, ge=1),
-    size: int = Query(DEFAULT_RECOMMENDATIONS_COUNT, ge=1, le=50),
+        resume_id: int,
+        location: Optional[str] = Query(None),
+        refresh: bool = Query(False),
+        page: int = Query(1, ge=1),
+        size: int = Query(DEFAULT_RECOMMENDATIONS_COUNT, ge=1, le=50),
 ):
     logger.info(
-        f"Get recommendations request for resume_id: {resume_id}, page: {page}, size: {size}"
+        f"Get recommendations request for resume_id: {resume_id}, page: {page}, size: {size}, location: {location}, refresh: {refresh}"
     )
     try:
         resume_data = ResumeModel.get_by_id(resume_id)
         if not resume_data:
+            logger.warning(f"Resume ID {resume_id} not found in DB.")
             raise HTTPException(status_code=404, detail=f"Resume {resume_id} not found")
 
-        job_location = location or resume_data.get("location") or DEFAULT_JOB_LOCATION
-        rec_cache_key = f"resume_{resume_id}_{job_location or 'default'}"
+        job_location_to_use = location or resume_data.get("location") or DEFAULT_JOB_LOCATION
+        logger.info(f"Using job location: {job_location_to_use} for recommendations (resume_id: {resume_id}).")
 
-        recommendations_list = RecommendationEngine.get_job_recommendations(
+        rec_cache_key = f"resume_{resume_id}_{job_location_to_use}"  # Removed 'or default' as job_location_to_use will have a value
+
+        all_recommendations_for_criteria = RecommendationEngine.get_job_recommendations(
             skills=resume_data.get("skills", []),
             experience=resume_data.get("experience", []),
             education=resume_data.get("education", []),
-            location=job_location,
-            num_recommendations=size * page + size,
+            location=job_location_to_use,
             cache_key=rec_cache_key,
             force_refresh=refresh,
-            page=page,
+            page=page
         )
+        logger.info(
+            f"RecommendationEngine returned {len(all_recommendations_for_criteria)} items for resume_id {resume_id}, page {page} request.")
 
         page_params_obj = PageParams(page=page, size=size)
-        paginated_result = paginate(recommendations_list, page_params_obj)
-        return paginated_result
+        paginated_result_dict = paginate(all_recommendations_for_criteria, page_params_obj)
+
+        final_response_content = {"recommendations": paginated_result_dict}
+
+        logger.debug(
+            f"Returning paginated recommendations for resume_id {resume_id}, page {page}: {str(final_response_content)[:200]}...")
+        return final_response_content
+
     except HTTPException as http_exc:
         raise http_exc
     except Exception as e:
-        logger.exception(f"Error getting recommendations for resume {resume_id}: {e}")
+        logger.exception(f"Unexpected error getting recommendations for resume {resume_id}, page {page}: {e}")
         raise HTTPException(
-            status_code=500, detail="Internal server error getting recommendations."
+            status_code=500, detail=f"Internal server error getting recommendations for resume {resume_id}."
         )
 
-
-@router.get("/search-jobs", response_model=PageResponse)
+@router.get("/search-jobs", response_model=PageResponse[JobItemType])  # Assuming JobItemType or specific job model
 async def search_jobs(
-    query: str = Query(..., min_length=1),
-    location: Optional[str] = Query(None),
-    page: int = Query(1, ge=1),
-    size: int = Query(DEFAULT_RECOMMENDATIONS_COUNT, ge=1, le=50),
-    load_more: bool = Query(False),
+        query: str = Query(..., min_length=1),
+        location: Optional[str] = Query(None),
+        page: int = Query(1, ge=1),
+        size: int = Query(DEFAULT_RECOMMENDATIONS_COUNT, ge=1, le=50),
+        load_more: bool = Query(False),
 ):
-    logger.info(f"Search jobs request: query='{query}', page={page}, size={size}")
+    logger.info(
+        f"Search jobs request: query='{query}', location='{location}', page={page}, size={size}, load_more={load_more}")
     try:
-        search_cache_key = f"search_{query}_{location or 'default'}"
+        search_base_cache_key = f"search_{query}_{location or 'default'}"
+
         all_matching_jobs = RecommendationEngine.search_jobs(
             query=query,
             location=location,
-            cache_key=search_cache_key,
+            cache_key=search_base_cache_key,
             page=page,
             size=size,
             fetch_more=load_more,
         )
+        logger.info(f"RecommendationEngine returned {len(all_matching_jobs)} items for search query '{query}'.")
+
         page_params_obj = PageParams(page=page, size=size)
-        paginated_jobs = paginate(all_matching_jobs, page_params_obj)
-        return paginated_jobs
+        paginated_jobs_dict = paginate(all_matching_jobs, page_params_obj)
+
+        return paginated_jobs_dict
     except Exception as e:
         logger.exception(f"Error during job search for query '{query}': {e}")
         raise HTTPException(
@@ -213,34 +236,35 @@ async def delete_cv(resume_id: int):
             raise HTTPException(status_code=404, detail=f"Resume {resume_id} not found")
 
         cv_url = resume_data.get("cv_url")
-        s3_deleted = False  # Default status
+        s3_deleted = False
         if cv_url:
-            logger.debug(f"Attempting S3 delete: {cv_url}")
-            s3_deleted = S3Service.delete_file(cv_url)
+            s3_object_name = cv_url.split(S3_BUCKET_NAME + ".s3.amazonaws.com/")[-1]  # Get object name from URL
+            logger.debug(f"Attempting S3 delete for object: {s3_object_name}")
+            s3_deleted = S3Service.delete_file(s3_object_name)  # Pass object name
             if not s3_deleted:
                 logger.error(
-                    f"Failed to delete S3 file {cv_url} for resume {resume_id}."
+                    f"Failed to delete S3 file {s3_object_name} for resume {resume_id}."
                 )
-                # Decide if this should be a fatal error or just a warning
-                # raise HTTPException(status_code=500, detail="Failed to delete associated S3 file.")
 
         logger.debug(f"Attempting DB delete for resume_id: {resume_id}")
         db_deleted = ResumeModel.delete(resume_id)
         if not db_deleted:
+            # If S3 delete failed, this part might not be reached if we raised an error for S3.
+            # Consider if S3 deletion failure should prevent DB deletion.
             logger.error(f"Failed to delete resume record {resume_id} from database.")
             raise HTTPException(
                 status_code=500, detail="Failed to delete resume record from database."
             )
 
         logger.info(
-            f"Successfully deleted resume {resume_id} (S3 delete status: {s3_deleted}, DB delete status: {db_deleted})"
+            f"Successfully processed delete for resume {resume_id} (S3 delete status: {s3_deleted}, DB delete status: {db_deleted})"
         )
 
-        location = resume_data.get("location") or DEFAULT_JOB_LOCATION
-        rec_cache_key = f"resume_{resume_id}_{location or 'default'}"
+        loc_for_cache = resume_data.get("location") or DEFAULT_JOB_LOCATION
+        rec_cache_key = f"resume_{resume_id}_{loc_for_cache}"
         RecommendationEngine.clear_cache(rec_cache_key)
 
-        return {"message": f"Resume with ID {resume_id} deleted successfully."}
+        return {"message": f"Resume with ID {resume_id} processed for deletion. S3 status: {s3_deleted}"}
     except HTTPException as http_exc:
         raise http_exc
     except Exception as e:
@@ -249,21 +273,19 @@ async def delete_cv(resume_id: int):
             status_code=500, detail="Internal server error during resume deletion."
         )
 
-
 @router.get("/load-more-jobs")
 async def load_more_jobs(
-    query: Optional[str] = Query(None),
-    location: Optional[str] = Query(None),
-    page: int = Query(1, ge=1),
-    size: int = Query(DEFAULT_RECOMMENDATIONS_COUNT, ge=1, le=50),
-    resume_id: Optional[int] = Query(None),
+        query: Optional[str] = Query(None),
+        location: Optional[str] = Query(None),
+        page: int = Query(1, ge=1),
+        size: int = Query(DEFAULT_RECOMMENDATIONS_COUNT, ge=1, le=50),
+        resume_id: Optional[int] = Query(None),
 ):
     logger.info(
-        f"Load more request: page={page}, size={size}, query='{query}', resume_id={resume_id}"
+        f"Load more jobs request: page={page}, size={size}, query='{query}', resume_id={resume_id}, location='{location}'"
     )
     if resume_id:
         try:
-            # Forwarding call (consider refactoring core logic)
             return await get_recommendations(
                 resume_id=resume_id,
                 location=location,
@@ -274,18 +296,17 @@ async def load_more_jobs(
         except HTTPException as http_exc:
             raise http_exc
         except Exception as e:
-            logger.exception(f"Error in load_more calling get_recommendations: {e}")
-            raise HTTPException(status_code=500, detail="Internal server error.")
+            logger.exception(f"Error in load_more forwarding to get_recommendations for resume_id {resume_id}: {e}")
+            raise HTTPException(status_code=500, detail="Internal server error during load more (recommendations).")
     elif query:
         try:
-            # Forwarding call (consider refactoring core logic)
             return await search_jobs(
                 query=query, location=location, page=page, size=size, load_more=True
             )
         except HTTPException as http_exc:
             raise http_exc
         except Exception as e:
-            logger.exception(f"Error in load_more calling search_jobs: {e}")
-            raise HTTPException(status_code=500, detail="Internal server error.")
+            logger.exception(f"Error in load_more forwarding to search_jobs for query '{query}': {e}")
+            raise HTTPException(status_code=500, detail="Internal server error during load more (search).")
     else:
-        raise HTTPException(status_code=400, detail="Requires 'resume_id' or 'query'.")
+        raise HTTPException(status_code=400, detail="Requires 'resume_id' or 'query' for loading more jobs.")

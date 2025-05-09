@@ -1,10 +1,6 @@
-# tests/test_services/test_recommendation_engine.py
-
-# import pytest # Removed F401
 from app.services.ml.recommendation_engine import RecommendationEngine
 from app.services.job_api_service import JobAPIService
 
-# Sample data needs to be defined or imported
 sample_skills_re = ["Python", "Testing"]
 sample_experience_re = ["Test Automation"]
 sample_education_re = ["CS Degree"]
@@ -62,5 +58,3 @@ class TestRecommendationEngine:
             num_recommendations=num_req,
         )
         assert len(recommendations) == num_req
-
-    # Other tests...

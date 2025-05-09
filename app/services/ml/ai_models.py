@@ -96,8 +96,8 @@ class JobRecommendationModel:
                     logger.error(f"Error during rollback: {rb_e}")
             return False
         finally:
-            if conn and not conn.closed:  # Check before close
-                conn.close()  # Fixed E701
+            if conn and not conn.closed:
+                conn.close()
 
     @staticmethod
     def get_recommendations(

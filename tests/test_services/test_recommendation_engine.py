@@ -1,13 +1,9 @@
-import pytest
-from unittest.mock import patch, MagicMock, ANY
-import requests # For requests.exceptions
+from unittest.mock import patch, MagicMock
+import requests
 
 from app.services.ml.recommendation_engine import RecommendationEngine
-from app.services.job_api_service import JobAPIService # Used as a dependency
-# If your RecommendationEngine uses settings directly for JOOBLE_API_KEY_RE, import settings
-# from app.config import settings
+from app.services.job_api_service import JobAPIService
 
-# Sample data (enhanced for more varied testing)
 sample_skills_re = ["Python", "Testing", "pytest"]
 sample_experience_re = ["Test Automation Engineer for 3 years", "QA Lead focusing on API testing"]
 sample_education_re = ["BSc Computer Science", "ISTQB Certified Tester"]
@@ -36,7 +32,7 @@ sample_jobs_for_re_tests = [
         "description": "", "url": "url4", "date_posted": "2024-01-04",
         "content": "Placeholder Role (No Desc)  CompD" # Content derived from title
     },
-    { # Job with minimal, non-matching content
+    {
         "id": "re_tst_5", "title": "Irrelevant Job", "company": "CompE", "location": "CityE",
         "description": "Looking for a chef.", "url": "url5", "date_posted": "2024-01-05",
         "content": "Irrelevant Job Looking for a chef. CompE"
@@ -50,7 +46,6 @@ class TestRecommendationEngine:
     def teardown_method(self):
         RecommendationEngine.clear_cache()
 
-    # --- get_job_recommendations Tests ---
     def test_get_job_recommendations_success_primary_source(self, mocker):
         mock_job_api_service_fetch = mocker.patch.object(
             JobAPIService, "fetch_jobs", return_value=sample_jobs_for_re_tests[:2]
@@ -147,7 +142,6 @@ class TestRecommendationEngine:
         )
         assert recommendations == []
 
-    # --- _match_jobs_to_profile Tests ---
     def test_match_jobs_to_profile_empty_user_profile_uses_fallback(self):
         recommendations = RecommendationEngine._match_jobs_to_profile(
             user_profile="   ", jobs=sample_jobs_for_re_tests, num_recommendations=2
@@ -177,7 +171,7 @@ class TestRecommendationEngine:
     def test_match_jobs_to_profile_general_exception_triggers_fallback(self, mocker):
         user_profile_str = RecommendationEngine._create_user_profile(sample_skills_re, sample_experience_re,
                                                                     sample_education_re)
-        # FIX: Patch cosine_similarity where it's used in recommendation_engine module
+
         mocker.patch("app.services.ml.recommendation_engine.cosine_similarity",
                      side_effect=Exception("Cosine sim exploded"))
 
@@ -185,7 +179,7 @@ class TestRecommendationEngine:
             user_profile=user_profile_str, jobs=sample_jobs_for_re_tests, num_recommendations=1
         )
         assert len(recommendations) == 1
-        assert 50 <= recommendations[0].get("match_score", 0) <= 70 # Check fallback score range
+        assert 50 <= recommendations[0].get("match_score", 0) <= 70
 
     def test_match_jobs_to_profile_no_valid_job_content(self):
         jobs_no_desc_no_content_key = [{"id": "job1", "title": "Test Only Title"}]
@@ -200,18 +194,15 @@ class TestRecommendationEngine:
         assert recommendations[0]["match_score"] == 0.0
 
     def test_match_jobs_to_profile_skips_job_with_truly_empty_content_string(self):
-        job_truly_empty = [{"id": "empty_job", "title": "", "description": "", "content": ""}] # content will be ""
-        # Another variation: job_truly_empty = [{"id": "empty_job", "title": "", "description": ""}] # content will be ""
+        job_truly_empty = [{"id": "empty_job", "title": "", "description": "", "content": ""}]
         user_profile_str = "python developer"
         recommendations = RecommendationEngine._match_jobs_to_profile(user_profile_str, job_truly_empty, 1)
         assert recommendations == []
 
-    # --- _fallback_job_ranking Tests ---
     def test_fallback_job_ranking_empty_jobs_list_returns_empty(self):
         ranked_jobs = RecommendationEngine._fallback_job_ranking(jobs=[], num_recommendations=5)
         assert ranked_jobs == []
 
-    # --- _fetch_jobs_from_jooble Tests ---
     @patch.object(requests, "post")
     def test_fetch_jobs_from_jooble_success(self, mock_requests_post):
         api_job_data = [{"id": "jooble_j1", "title": "Jooble Job Alpha", "snippet": "Description alpha", "company": "Jooble Corp", "location": "World"}]
@@ -289,7 +280,6 @@ class TestRecommendationEngine:
         assert not RecommendationEngine._job_cache
         assert not RecommendationEngine._pagination_state
 
-    # --- get_job_stats Tests ---
     @patch.object(RecommendationEngine, "_fetch_jobs_from_jooble")
     def test_get_job_stats_no_jobs_fetched(self, mock_fetch_jooble):
         mock_fetch_jooble.return_value = []
@@ -307,9 +297,9 @@ class TestRecommendationEngine:
              "location": "Colombo", "salary": "LKR 100,000 - 150,000 per month"},
             {"title": "Java Contract Role",
              "description": "Core Java expert for a 6-month contract. JavaScript is a plus.", "location": "Remote",
-             "salary": "USD 50 per hour"}, # This will be parsed as 50.0
+             "salary": "USD 50 per hour"},
             {"title": "Python Intern (Full time)", "description": "Learn python on the job.", "location": "Colombo",
-             "salary": "allowance 30k"}, # This will be parsed as 30.0
+             "salary": "allowance 30k"},
             {"title": "Project Manager (Agile)", "description": "Agile and Scrum master.", "location": "Kandy"}
         ]
         mock_fetch_jooble.return_value = mock_jobs_data
@@ -319,15 +309,12 @@ class TestRecommendationEngine:
         assert "python" in stats["top_skills"]
         assert "java" in stats["top_skills"]
         assert stats["locations"] == {"Colombo": 2, "Remote": 1, "Kandy": 1}
-        # FIX: Adjust salary assertion based on current regex behavior
-        assert stats["salary_range"]["min"] == 30.0  # From "allowance 30k" -> 30.0
-        assert stats["salary_range"]["max"] == 100000.0 # From "LKR 100,000" -> 100000.0
-        # Average of [100000.0, 50.0, 30.0] = 100080.0 / 3 = 33360.0
+        assert stats["salary_range"]["min"] == 30.0
+        assert stats["salary_range"]["max"] == 100000.0
         assert stats["salary_range"]["avg"] == 33360
-        assert "Full-time" in stats["job_types"] and stats["job_types"]["Full-time"] >= 2 # Corrected from >= to == for exactness if known
+        assert "Full-time" in stats["job_types"] and stats["job_types"]["Full-time"] >= 2
         assert "Contract" in stats["job_types"] and stats["job_types"]["Contract"] >= 1
 
-    # --- search_jobs and has_more_jobs (Placeholders) ---
     def test_search_jobs_placeholder_returns_empty_list(self):
         result = RecommendationEngine.search_jobs(query="anything", location="anywhere", page=1, size=10)
         assert result == []

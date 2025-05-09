@@ -1,7 +1,5 @@
-# app/services/s3_service.py
-
 import boto3
-from botocore.exceptions import NoCredentialsError, ClientError # Ensure ClientError is imported
+from botocore.exceptions import NoCredentialsError, ClientError
 from app.config.settings import (
     AWS_ACCESS_KEY,
     AWS_SECRET_KEY,
@@ -33,19 +31,16 @@ class S3Service:
         if object_name is None:
             if not hasattr(file_obj, 'filename') or not file_obj.filename:
                 logger.error("S3 Upload Error: file_obj is missing a filename and no object_name was provided.")
-                # Fallback or raise specific error
-                # For now, let's ensure a default name if possible or raise
                 raise ValueError("Filename is required when object_name is not provided.")
             base_object_name = file_obj.filename
         else:
             base_object_name = object_name
 
-        # Add the "uploads/" prefix
         final_object_name = f"uploads/{base_object_name}"
 
         if not S3_BUCKET_NAME:
             logger.error("S3 Upload Error: S3_BUCKET_NAME is not configured.")
-            print("S3 Upload Error: S3_BUCKET_NAME is not configured.") # For capsys
+            print("S3 Upload Error: S3_BUCKET_NAME is not configured.")
             raise Exception("S3_BUCKET_NAME is not configured.")
 
 
@@ -57,7 +52,6 @@ class S3Service:
         )
 
         try:
-            # Ensure file_obj.file is the actual file-like object (e.g., BytesIO)
             if not hasattr(file_obj, 'file') or not callable(getattr(file_obj.file, 'seek', None)):
                 logger.error("S3 Upload Error: file_obj.file is not a valid seekable stream.")
                 raise TypeError("file_obj.file must be a seekable file-like object.")
@@ -69,15 +63,15 @@ class S3Service:
             return s3_url
         except NoCredentialsError:
             logger.error("S3 Upload Error: AWS credentials not available.")
-            print("S3 Upload Error: AWS credentials not available.") # For capsys test
+            print("S3 Upload Error: AWS credentials not available.")
             raise Exception("AWS credentials not available")
-        except ClientError as e: # Catch specific Boto3 client errors
+        except ClientError as e:
             logger.error(f"S3 Upload Error (ClientError): {str(e)}", exc_info=True)
-            print(f"S3 Upload Error (ClientError): {str(e)}") # For capsys test
+            print(f"S3 Upload Error (ClientError): {str(e)}")
             raise Exception(f"S3 upload error (ClientError): {str(e)}")
-        except Exception as e: # Catch any other exceptions
+        except Exception as e:
             logger.error(f"S3 Upload Error (Generic): {str(e)}", exc_info=True)
-            print(f"S3 Upload Error (Generic): {str(e)}") # For capsys test
+            print(f"S3 Upload Error (Generic): {str(e)}")
             raise Exception(f"S3 upload error (Generic): {str(e)}")
 
     @staticmethod
@@ -94,12 +88,12 @@ class S3Service:
         """
         if not S3_BUCKET_NAME:
             logger.error("S3 Delete Error: S3_BUCKET_NAME is not configured.")
-            print("S3 Delete Error: S3_BUCKET_NAME is not configured.") # For capsys
+            print("S3 Delete Error: S3_BUCKET_NAME is not configured.")
             return False
 
-        if not object_name: # Object name should not be empty
+        if not object_name:
             logger.error("S3 Delete Error: Object name cannot be empty.")
-            print("S3 Delete Error: Object name cannot be empty.") # For capsys
+            print("S3 Delete Error: Object name cannot be empty.")
             return False
 
         s3_client = boto3.client(

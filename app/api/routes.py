@@ -1,5 +1,5 @@
 from fastapi import APIRouter, File, UploadFile, Form, Query, HTTPException
-from typing import Optional, List, TypeVar  # TypeVar එක import කරගන්න
+from typing import Optional, TypeVar
 import logging
 
 from app.services.s3_service import S3Service
@@ -139,7 +139,7 @@ async def get_recommendations(
         job_location_to_use = location or resume_data.get("location") or DEFAULT_JOB_LOCATION
         logger.info(f"Using job location: {job_location_to_use} for recommendations (resume_id: {resume_id}).")
 
-        rec_cache_key = f"resume_{resume_id}_{job_location_to_use}"  # Removed 'or default' as job_location_to_use will have a value
+        rec_cache_key = f"resume_{resume_id}_{job_location_to_use}"
 
         all_recommendations_for_criteria = RecommendationEngine.get_job_recommendations(
             skills=resume_data.get("skills", []),
@@ -170,7 +170,7 @@ async def get_recommendations(
             status_code=500, detail=f"Internal server error getting recommendations for resume {resume_id}."
         )
 
-@router.get("/search-jobs", response_model=PageResponse[JobItemType])  # Assuming JobItemType or specific job model
+@router.get("/search-jobs", response_model=PageResponse[JobItemType])
 async def search_jobs(
         query: str = Query(..., min_length=1),
         location: Optional[str] = Query(None),
@@ -238,9 +238,9 @@ async def delete_cv(resume_id: int):
         cv_url = resume_data.get("cv_url")
         s3_deleted = False
         if cv_url:
-            s3_object_name = cv_url.split(S3_BUCKET_NAME + ".s3.amazonaws.com/")[-1]  # Get object name from URL
+            s3_object_name = cv_url.split(S3_BUCKET_NAME + ".s3.amazonaws.com/")[-1]
             logger.debug(f"Attempting S3 delete for object: {s3_object_name}")
-            s3_deleted = S3Service.delete_file(s3_object_name)  # Pass object name
+            s3_deleted = S3Service.delete_file(s3_object_name)
             if not s3_deleted:
                 logger.error(
                     f"Failed to delete S3 file {s3_object_name} for resume {resume_id}."
@@ -249,8 +249,6 @@ async def delete_cv(resume_id: int):
         logger.debug(f"Attempting DB delete for resume_id: {resume_id}")
         db_deleted = ResumeModel.delete(resume_id)
         if not db_deleted:
-            # If S3 delete failed, this part might not be reached if we raised an error for S3.
-            # Consider if S3 deletion failure should prevent DB deletion.
             logger.error(f"Failed to delete resume record {resume_id} from database.")
             raise HTTPException(
                 status_code=500, detail="Failed to delete resume record from database."

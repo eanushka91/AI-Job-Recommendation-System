@@ -157,7 +157,7 @@ class RecommendationEngine:
         if not user_profile or not jobs:
             logger.warning(
                 "RE Match: User profile or jobs list is empty."
-            )  # Fixed E701
+            )
             return []
         job_contents, valid_jobs = [], []
         for job in jobs:
@@ -243,7 +243,7 @@ class RecommendationEngine:
     ) -> List[Dict[str, Any]]:
         logger.warning(f"RE Fallback: Using random ranking for {len(jobs)} jobs.")
         if not jobs:
-            return []  # Fixed E701
+            return []
         scored_jobs = []
         for job in jobs:
             job_copy = job.copy()
@@ -290,7 +290,7 @@ class RecommendationEngine:
                 if not isinstance(job_data, dict):
                     logger.warning(
                         f"RE Jooble Fetch: Skipping non-dict: {job_data}"
-                    )  # Fixed E701
+                    )
                     continue
                 title = job_data.get("title", "")
                 snippet = job_data.get("snippet", "")
@@ -366,7 +366,7 @@ class RecommendationEngine:
                         salary_value = float(salary_match.group(1).replace(",", ""))
                         salaries.append(salary_value)
                     except ValueError:
-                        pass  # Ignore conversion errors silently
+                        pass
         if salaries:
             stats["salary_range"]["min"] = min(salaries)
             stats["salary_range"]["max"] = max(salaries)

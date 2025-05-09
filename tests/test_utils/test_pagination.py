@@ -1,6 +1,3 @@
-# tests/test_utils/test_pagination.py
-
-# import pytest # Removed F401
 from app.api.pagination import paginate
 
 
@@ -28,5 +25,3 @@ class TestPaginationUtil:
         result_neg = paginate(items, page_params_neg)
         assert result_neg["size"] == 1
         assert result_neg["pages"] == 10
-
-    # Other tests...

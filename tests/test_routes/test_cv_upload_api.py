@@ -1,12 +1,9 @@
 from fastapi.testclient import TestClient
-from fastapi import HTTPException
 import io
-import pytest
-from unittest.mock import ANY, patch # Added patch here
+from unittest.mock import ANY, patch
 
 from app.config import settings
 
-# --- Existing constants ---
 VALID_RESUME_ID = 101
 MOCK_RESUME_DATA = {
     "id": VALID_RESUME_ID, "user_id": 1, "cv_url": "http://s3/cv.pdf",
@@ -16,12 +13,6 @@ MOCK_RESUME_DATA = {
 MOCK_RECOMMENDATIONS_PAYLOAD = [{"id": "job1", "title": "Awesome Job"}]
 MOCK_SEARCH_RESULTS = [{"id": "search1", "title": "Found Job"}]
 MOCK_JOB_STATS = {"total_matching_jobs": 50, "top_skills": ["python", "java"]}
-
-
-# --- Tests for /api/upload-cv ---
-# (Keep your existing tests for /upload-cv here)
-# test_upload_cv_success, test_upload_cv_invalid_file_type,
-# test_upload_cv_s3_failure, test_upload_cv_user_not_found
 
 def test_upload_cv_user_creation_fails(
     client: TestClient,
@@ -67,10 +58,9 @@ def test_upload_cv_resume_creation_fails(
 def test_upload_cv_unexpected_generic_exception(
     client: TestClient,
     mock_s3_upload,
-    # We will use 'patch' here locally, ensure 'patch' is imported: from unittest.mock import patch
 ):
     mock_s3_upload.return_value = "http://fake-s3-url.com/generic_error.pdf"
-    from app.db import models as db_models # Import locally for patch target
+    from app.db import models as db_models
     with patch.object(db_models.ResumeModel, 'create', side_effect=ValueError("Unexpected DB trouble")):
         pdf_content = b"%PDF-1.4\n%generic"
         files = {"file": ("generic.pdf", io.BytesIO(pdf_content), "application/pdf")}
@@ -82,15 +72,12 @@ def test_upload_cv_unexpected_generic_exception(
         assert response.json()["detail"] == "An internal server error occurred during CV upload."
 
 
-# --- Tests for /api/recommendations/{resume_id} ---
-
 def test_get_recommendations_success(
     client: TestClient,
     mock_resume_model_get_by_id,
     mock_recommendation_engine_get_recommendations
 ):
     mock_resume_model_get_by_id.return_value = MOCK_RESUME_DATA
-    # Ensure enough items for default pagination (size 10 usually)
     mock_recommendation_engine_get_recommendations.return_value = MOCK_RECOMMENDATIONS_PAYLOAD * 5
 
     response = client.get(f"/api/recommendations/{VALID_RESUME_ID}?page=1&size=5")
@@ -98,7 +85,6 @@ def test_get_recommendations_success(
     assert response.status_code == 200
     data = response.json()
     assert "recommendations" in data
-    # The items will be a slice of the full payload due to pagination
     assert len(data["recommendations"]["items"]) == 5
     assert data["recommendations"]["items"][0] == MOCK_RECOMMENDATIONS_PAYLOAD[0]
     assert data["recommendations"]["page"] == 1
@@ -167,15 +153,11 @@ def test_get_recommendations_engine_exception(
     assert response.status_code == 500
     assert response.json()["detail"] == f"Internal server error getting recommendations for resume {VALID_RESUME_ID}."
 
-
-# --- Tests for /api/search-jobs ---
-
 def test_search_jobs_success(
     client: TestClient, mock_recommendation_engine_search_jobs
 ):
     search_query = "developer"
     search_location = "Kandy"
-    # Ensure enough items for default pagination
     mock_recommendation_engine_search_jobs.return_value = MOCK_SEARCH_RESULTS * 10
 
     response = client.get(
@@ -211,7 +193,6 @@ def test_search_jobs_engine_exception(
     assert response.status_code == 500
     assert response.json()["detail"] == "Internal server error during job search."
 
-# --- Tests for /api/job-stats/{resume_id} ---
 
 def test_get_job_stats_success(
     client: TestClient, mock_resume_model_get_by_id, mock_recommendation_engine_get_job_stats
@@ -249,8 +230,6 @@ def test_get_job_stats_engine_exception(
     assert response.status_code == 500
     assert response.json()["detail"] == "Internal server error generating job stats."
 
-
-# --- Tests for /api/delete-cv/{resume_id} ---
 
 def test_delete_cv_success(
     client: TestClient, mock_resume_model_get_by_id, mock_s3_delete, mock_resume_model_delete, mocker
@@ -338,20 +317,17 @@ def test_delete_cv_s3_service_raises_exception(
     assert "Internal server error during resume deletion." in response.json()["detail"]
 
 
-# --- Tests for /api/load-more-jobs ---
-
 def test_load_more_jobs_for_resume_id_success(client: TestClient, mock_resume_model_get_by_id, mock_recommendation_engine_get_recommendations):
     mock_resume_model_get_by_id.return_value = MOCK_RESUME_DATA
-    # FIX: Return enough items for page=2, size=7 (e.g., 8 items)
     mock_recs = [{"title": f"More Rec Job {i}"} for i in range(8)]
     mock_recommendation_engine_get_recommendations.return_value = mock_recs
 
     response = client.get(f"/api/load-more-jobs?resume_id={VALID_RESUME_ID}&page=2&size=7&location=TestCity")
     assert response.status_code == 200
     data = response.json()["recommendations"]
-    assert len(data["items"]) == 1 # 8 items total, size 7. Page 1 has 7, Page 2 has 1.
+    assert len(data["items"]) == 1
     assert data["items"][0]["title"] == "More Rec Job 7"
-    assert data["page"] == 2 # This should now pass
+    assert data["page"] == 2
     assert data["size"] == 7
     mock_recommendation_engine_get_recommendations.assert_called_with(
         skills=ANY, experience=ANY, education=ANY,
@@ -365,16 +341,15 @@ def test_load_more_jobs_for_resume_id_success(client: TestClient, mock_resume_mo
 def test_load_more_jobs_for_query_success(client: TestClient, mock_recommendation_engine_search_jobs):
     query_val = "senior dev"
     location_val = "WFH"
-    # FIX: Return enough items for page=3, size=8 (e.g., 17 items)
     mock_search = [{"title": f"More Search Job {i}"} for i in range(17)]
     mock_recommendation_engine_search_jobs.return_value = mock_search
 
     response = client.get(f"/api/load-more-jobs?query={query_val}&location={location_val}&page=3&size=8")
     assert response.status_code == 200
     data = response.json()
-    assert len(data["items"]) == 1 # 17 items total, size 8. Page 1 (8), Page 2 (8), Page 3 (1)
+    assert len(data["items"]) == 1
     assert data["items"][0]["title"] == "More Search Job 16"
-    assert data["page"] == 3 # This should now pass
+    assert data["page"] == 3
     assert data["size"] == 8
 
     mock_recommendation_engine_search_jobs.assert_called_with(
@@ -402,7 +377,6 @@ def test_load_more_jobs_forwarded_generic_exception_from_recommendations(
 
     response = client.get(f"/api/load-more-jobs?resume_id={VALID_RESUME_ID}&page=1")
     assert response.status_code == 500
-    # FIX: Expect the message from get_recommendations's generic handler
     assert f"Internal server error getting recommendations for resume {VALID_RESUME_ID}." in response.json()["detail"]
 
 def test_load_more_jobs_forwarded_generic_exception_from_search(
@@ -410,9 +384,8 @@ def test_load_more_jobs_forwarded_generic_exception_from_search(
 ):
     mock_recommendation_engine_search_jobs.side_effect = Exception("Search engine internal error")
 
-    response = client.get(f"/api/load-more-jobs?query=anything&page=1")
+    response = client.get("/api/load-more-jobs?query=anything&page=1")
     assert response.status_code == 500
-    # FIX: Expect the message from search_jobs's generic handler
     assert "Internal server error during job search." in response.json()["detail"]
 
 

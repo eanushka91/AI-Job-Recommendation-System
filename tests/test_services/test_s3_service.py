@@ -1,21 +1,16 @@
-# tests/test_services/test_s3_service.py
-
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 import io
-import re  # Import re for escaping regex special characters
+import re
 
-# Import S3Service from your app's services module
 from app.services.s3_service import S3Service
-# Import settings to access S3_BUCKET_NAME and allow mocking it
-from app.config import settings  # Assuming your settings.py is in app/config/
+from app.config import settings
 
-# Import specific exceptions for more targeted testing
 from botocore.exceptions import NoCredentialsError, ClientError
 
 
 @pytest.fixture
-def mock_boto3_s3_client(mocker):  # Renamed for clarity
+def mock_boto3_s3_client(mocker):
     """Mocks boto3.client('s3') to return a mock S3 client instance."""
     mock_s3_instance = MagicMock(name="MockBoto3S3ClientInstance")
     mocker.patch('boto3.client', return_value=mock_s3_instance)
@@ -23,7 +18,7 @@ def mock_boto3_s3_client(mocker):  # Renamed for clarity
 
 
 @pytest.fixture
-def mock_upload_file_obj():  # Renamed for clarity
+def mock_upload_file_obj():
     """
     Creates a mock UploadFile-like object.
     The 'file' attribute is a real BytesIO stream with a mocked 'seek' method.
@@ -106,10 +101,9 @@ class TestS3ServiceUpload:
             self, mock_boto3_s3_client, mock_upload_file_obj, capsys
     ):
         error_message_detail = "Mocked Boto3 ClientError (e.g., AccessDenied)"
-        operation_name = "UploadFileobj"  # Should match the operation if included in str(e)
+        operation_name = "UploadFileobj"
         error_code = "AccessDenied"
 
-        # This is closer to what str(ClientError) produces
         full_error_str = f"An error occurred ({error_code}) when calling the {operation_name} operation: {error_message_detail}"
 
         error_response = {'Error': {'Code': error_code, 'Message': error_message_detail}}
@@ -117,8 +111,6 @@ class TestS3ServiceUpload:
             error_response=error_response, operation_name=operation_name
         )
 
-        # The exception raised by S3Service will be: Exception(f"S3 upload error (ClientError): {str(e)}")
-        # So we need to match against that.
         expected_match_pattern = re.escape(f"S3 upload error (ClientError): {full_error_str}")
 
         with pytest.raises(Exception, match=expected_match_pattern):
@@ -126,7 +118,6 @@ class TestS3ServiceUpload:
 
         mock_upload_file_obj.file.seek.assert_called_once_with(0)
         captured = capsys.readouterr()
-        # The print statement in S3Service also uses str(e)
         assert f"S3 Upload Error (ClientError): {full_error_str}" in captured.out
 
     def test_upload_file_generic_exception_during_upload(
@@ -135,7 +126,6 @@ class TestS3ServiceUpload:
         generic_error_msg = "A very unexpected network problem!"
         mock_boto3_s3_client.upload_fileobj.side_effect = Exception(generic_error_msg)
 
-        # Escape generic_error_msg in case it contains regex special characters
         expected_match_pattern = re.escape(f"S3 upload error (Generic): {generic_error_msg}")
 
         with pytest.raises(Exception, match=expected_match_pattern):
@@ -198,7 +188,6 @@ class TestS3ServiceDelete:
         operation_name = "DeleteObject"
         error_code = "NoSuchKey"
 
-        # This is the string that str(ClientError) will produce
         full_error_str = f"An error occurred ({error_code}) when calling the {operation_name} operation: {error_message_detail}"
 
         error_response = {'Error': {'Code': error_code, 'Message': error_message_detail}}
@@ -213,7 +202,6 @@ class TestS3ServiceDelete:
             Bucket=settings.S3_BUCKET_NAME, Key=self.VALID_S3_OBJECT_KEY
         )
         captured = capsys.readouterr()
-        # The print statement in S3Service uses str(e), which includes the full ClientError string
         expected_print_output = f"S3 Delete Error (ClientError): Code: {error_code}, Message: {full_error_str}"
         assert expected_print_output in captured.out
 

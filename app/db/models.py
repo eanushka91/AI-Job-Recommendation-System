@@ -90,7 +90,7 @@ class ResumeModel:
                 """
                 cur.execute(
                     sql_query,
-                    (user_id, cv_url, skills, experience, education, location), # <<< location එක query එකට දුන්නා
+                    (user_id, cv_url, skills, experience, education, location),
                 )
                 result = cur.fetchone()
                 if result:

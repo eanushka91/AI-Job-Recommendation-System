@@ -90,7 +90,6 @@ def db_session_for_integration(test_db_connection):
     cursor.close()
 
 
-# --- FastAPI Test Client Fixture ---
 @pytest.fixture(scope="module")
 def client():
     """Provides a FastAPI TestClient instance for route testing."""

@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import patch, MagicMock, PropertyMock
+from unittest.mock import MagicMock, PropertyMock
 import psycopg2
 from datetime import datetime, timezone
 import logging
@@ -32,7 +32,6 @@ def mock_db_conn_for_ai_models(mocker):
     mock_cursor.__exit__.return_value = None
 
     patch_target = 'app.services.ml.ai_models.get_db_connection'
-    # --------------------------------------------
 
     try:
         patcher = mocker.patch(patch_target, return_value=mock_conn)

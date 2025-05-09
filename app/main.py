@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from app.api.routes import router as api_router
 from app.db.database import init_db
 
+
 @asynccontextmanager
 async def lifespan(current_app: FastAPI):
     print("Application Lifespan: Startup sequence initiated...")
@@ -17,6 +18,7 @@ async def lifespan(current_app: FastAPI):
     yield
 
     print("Application Lifespan: Shutdown sequence initiated...")
+
 
 app = FastAPI(
     title="CV Upload System",

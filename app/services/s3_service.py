@@ -10,6 +10,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 class S3Service:
     """Service for S3 operations"""
 
@@ -29,9 +30,13 @@ class S3Service:
             S3 URL if successful, otherwise raises an Exception.
         """
         if object_name is None:
-            if not hasattr(file_obj, 'filename') or not file_obj.filename:
-                logger.error("S3 Upload Error: file_obj is missing a filename and no object_name was provided.")
-                raise ValueError("Filename is required when object_name is not provided.")
+            if not hasattr(file_obj, "filename") or not file_obj.filename:
+                logger.error(
+                    "S3 Upload Error: file_obj is missing a filename and no object_name was provided."
+                )
+                raise ValueError(
+                    "Filename is required when object_name is not provided."
+                )
             base_object_name = file_obj.filename
         else:
             base_object_name = object_name
@@ -43,7 +48,6 @@ class S3Service:
             print("S3 Upload Error: S3_BUCKET_NAME is not configured.")
             raise Exception("S3_BUCKET_NAME is not configured.")
 
-
         s3_client = boto3.client(
             "s3",
             aws_access_key_id=AWS_ACCESS_KEY,
@@ -52,14 +56,20 @@ class S3Service:
         )
 
         try:
-            if not hasattr(file_obj, 'file') or not callable(getattr(file_obj.file, 'seek', None)):
-                logger.error("S3 Upload Error: file_obj.file is not a valid seekable stream.")
+            if not hasattr(file_obj, "file") or not callable(
+                getattr(file_obj.file, "seek", None)
+            ):
+                logger.error(
+                    "S3 Upload Error: file_obj.file is not a valid seekable stream."
+                )
                 raise TypeError("file_obj.file must be a seekable file-like object.")
 
             file_obj.file.seek(0)
             s3_client.upload_fileobj(file_obj.file, S3_BUCKET_NAME, final_object_name)
             s3_url = f"https://{S3_BUCKET_NAME}.s3.amazonaws.com/{final_object_name}"
-            logger.info(f"Successfully uploaded {final_object_name} to S3. URL: {s3_url}")
+            logger.info(
+                f"Successfully uploaded {final_object_name} to S3. URL: {s3_url}"
+            )
             return s3_url
         except NoCredentialsError:
             logger.error("S3 Upload Error: AWS credentials not available.")
@@ -103,21 +113,31 @@ class S3Service:
             region_name=AWS_REGION,
         )
         try:
-            logger.info(f"Attempting to delete '{object_name}' from S3 bucket '{S3_BUCKET_NAME}'")
+            logger.info(
+                f"Attempting to delete '{object_name}' from S3 bucket '{S3_BUCKET_NAME}'"
+            )
             s3_client.delete_object(Bucket=S3_BUCKET_NAME, Key=object_name)
-            logger.info(f"Successfully deleted '{object_name}' from S3 bucket '{S3_BUCKET_NAME}'")
-            print(f"Successfully deleted '{object_name}' from S3 bucket '{S3_BUCKET_NAME}'") # For capsys
+            logger.info(
+                f"Successfully deleted '{object_name}' from S3 bucket '{S3_BUCKET_NAME}'"
+            )
+            print(
+                f"Successfully deleted '{object_name}' from S3 bucket '{S3_BUCKET_NAME}'"
+            )  # For capsys
             return True
         except NoCredentialsError:
             logger.error("S3 Delete Error: AWS credentials not available.")
-            print("S3 Delete Error: AWS credentials not available.") # For capsys
+            print("S3 Delete Error: AWS credentials not available.")  # For capsys
             return False
         except ClientError as e:
             error_code = e.response.get("Error", {}).get("Code")
-            logger.error(f"S3 Delete Error (ClientError): Code: {error_code}, Message: {str(e)}")
-            print(f"S3 Delete Error (ClientError): Code: {error_code}, Message: {str(e)}") # For capsys
+            logger.error(
+                f"S3 Delete Error (ClientError): Code: {error_code}, Message: {str(e)}"
+            )
+            print(
+                f"S3 Delete Error (ClientError): Code: {error_code}, Message: {str(e)}"
+            )  # For capsys
             return False
         except Exception as e:
             logger.error(f"S3 Delete Error (Generic): {str(e)}", exc_info=True)
-            print(f"S3 Delete Error (Generic): {str(e)}") # For capsys
+            print(f"S3 Delete Error (Generic): {str(e)}")  # For capsys
             return False

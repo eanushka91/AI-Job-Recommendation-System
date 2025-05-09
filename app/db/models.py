@@ -73,7 +73,7 @@ class ResumeModel:
         skills: List[str],
         experience: List[str],
         education: List[str],
-        location: str | None = None, # <<< Location parameter එක add කරා
+        location: str | None = None,  # <<< Location parameter එක add කරා
     ) -> int | None:
         """Create a new resume entry in the database, return ID or None."""
         conn = None

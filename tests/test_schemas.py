@@ -2,6 +2,7 @@ import pytest
 from pydantic import ValidationError
 from app.schemas.schemas import BaseResponse, ResumeDataInput
 
+
 class TestBaseResponse:
     def test_base_response_valid(self):
         data = {"message": "Success"}
@@ -10,7 +11,7 @@ class TestBaseResponse:
 
     def test_base_response_missing_message(self):
         with pytest.raises(ValidationError) as excinfo:
-            BaseResponse() # type: ignore
+            BaseResponse()  # type: ignore
         assert "message" in str(excinfo.value)
 
 
@@ -20,7 +21,7 @@ class TestResumeDataInput:
             "skills": ["Python", "FastAPI"],
             "experience": ["Software Engineer for 5 years"],
             "education": ["BSc Computer Science"],
-            "location": "Colombo"
+            "location": "Colombo",
         }
         resume_input = ResumeDataInput(**data)
         assert resume_input.skills == data["skills"]
@@ -38,25 +39,24 @@ class TestResumeDataInput:
     def test_resume_data_input_skills_not_list(self):
         with pytest.raises(ValidationError) as excinfo:
             ResumeDataInput(skills="Python")
-        assert any(err['type'] == 'list_type' and err['loc'] == ('skills',) for err in excinfo.value.errors())
-
+        assert any(
+            err["type"] == "list_type" and err["loc"] == ("skills",)
+            for err in excinfo.value.errors()
+        )
 
     def test_resume_data_input_location_invalid_type(self):
         with pytest.raises(ValidationError) as excinfo:
             ResumeDataInput(location=123)
 
         assert any(
-            (err['type'] == 'string_type' or err['type'] == 'model_attributes_type') and
-            err['loc'] == ('location',)
+            (err["type"] == "string_type" or err["type"] == "model_attributes_type")
+            and err["loc"] == ("location",)
             for err in excinfo.value.errors()
         )
 
     def test_resume_data_input_extra_field(self):
         # Pydantic models by default ignore extra fields
-        data = {
-            "skills": ["Python"],
-            "extra_field": "should be ignored"
-        }
+        data = {"skills": ["Python"], "extra_field": "should be ignored"}
         resume_input = ResumeDataInput(**data)
         assert resume_input.skills == ["Python"]
         assert not hasattr(resume_input, "extra_field")

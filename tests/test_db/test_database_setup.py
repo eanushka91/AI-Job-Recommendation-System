@@ -3,6 +3,7 @@ import psycopg2
 
 from app.db.database import get_db_connection, create_tables, init_db
 
+
 @pytest.fixture(scope="module")
 def db_conn_for_integration_tests():
     try:
@@ -23,14 +24,10 @@ def db_conn_for_integration_tests():
         )
 
 
-
-
 def test_get_db_connection_mocked(mocker):
     """Test get_db_connection when connection is successful (mocking psycopg2.connect)"""
     mock_connect = mocker.patch("psycopg2.connect")
-    mock_conn_obj = mocker.MagicMock(
-        name="mock_db_conn_success"
-    )
+    mock_conn_obj = mocker.MagicMock(name="mock_db_conn_success")
     mock_connect.return_value = mock_conn_obj
 
     mocker.patch("app.db.database.DB_HOST", "mock_host")

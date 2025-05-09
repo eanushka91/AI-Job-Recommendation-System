@@ -52,9 +52,7 @@ def init_db():
     except Exception as e:
         logger.error(f"Database initialization failed: {e}", exc_info=True)
     finally:
-        if (
-            conn and not conn.closed
-        ):
+        if conn and not conn.closed:
             conn.close()
             logger.debug("Database connection closed after init_db.")
 

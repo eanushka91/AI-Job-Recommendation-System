@@ -5,39 +5,67 @@ from app.services.ml.recommendation_engine import RecommendationEngine
 from app.services.job_api_service import JobAPIService
 
 sample_skills_re = ["Python", "Testing", "pytest"]
-sample_experience_re = ["Test Automation Engineer for 3 years", "QA Lead focusing on API testing"]
+sample_experience_re = [
+    "Test Automation Engineer for 3 years",
+    "QA Lead focusing on API testing",
+]
 sample_education_re = ["BSc Computer Science", "ISTQB Certified Tester"]
 
 sample_jobs_for_re_tests = [
     {
-        "id": "re_tst_1", "title": "Python Test Engineer", "company": "CompA", "location": "CityA",
+        "id": "re_tst_1",
+        "title": "Python Test Engineer",
+        "company": "CompA",
+        "location": "CityA",
         "description": "We need strong python skills and pytest experience for test automation.",
-        "url": "url1", "date_posted": "2024-01-01", "salary": "LKR 150000",
-        "content": "Python Test Engineer We need strong python skills and pytest experience for test automation. CompA"
+        "url": "url1",
+        "date_posted": "2024-01-01",
+        "salary": "LKR 150000",
+        "content": "Python Test Engineer We need strong python skills and pytest experience for test automation. CompA",
     },
     {
-        "id": "re_tst_2", "title": "QA Automation (Python)", "company": "CompB", "location": "CityB",
+        "id": "re_tst_2",
+        "title": "QA Automation (Python)",
+        "company": "CompB",
+        "location": "CityB",
         "description": "Automate mobile and web tests using Python.",
-        "url": "url2", "date_posted": "2024-01-02", "salary": "USD 1200",
-        "content": "QA Automation (Python) Automate mobile and web tests using Python. CompB"
+        "url": "url2",
+        "date_posted": "2024-01-02",
+        "salary": "USD 1200",
+        "content": "QA Automation (Python) Automate mobile and web tests using Python. CompB",
     },
     {
-        "id": "re_tst_3", "title": "Senior Java Developer", "company": "CompC", "location": "CityC",
+        "id": "re_tst_3",
+        "title": "Senior Java Developer",
+        "company": "CompC",
+        "location": "CityC",
         "description": "Expert in core java, spring boot, and microservices. Experience with CI/CD a plus.",
-        "url": "url3", "date_posted": "2024-01-03",
-        "content": "Senior Java Developer Expert in core java, spring boot, and microservices. Experience with CI/CD a plus. CompC"
+        "url": "url3",
+        "date_posted": "2024-01-03",
+        "content": "Senior Java Developer Expert in core java, spring boot, and microservices. Experience with CI/CD a plus. CompC",
     },
     {
-        "id": "re_tst_4", "title": "Placeholder Role (No Desc)", "company": "CompD", "location": "CityD",
-        "description": "", "url": "url4", "date_posted": "2024-01-04",
-        "content": "Placeholder Role (No Desc)  CompD" # Content derived from title
+        "id": "re_tst_4",
+        "title": "Placeholder Role (No Desc)",
+        "company": "CompD",
+        "location": "CityD",
+        "description": "",
+        "url": "url4",
+        "date_posted": "2024-01-04",
+        "content": "Placeholder Role (No Desc)  CompD",  # Content derived from title
     },
     {
-        "id": "re_tst_5", "title": "Irrelevant Job", "company": "CompE", "location": "CityE",
-        "description": "Looking for a chef.", "url": "url5", "date_posted": "2024-01-05",
-        "content": "Irrelevant Job Looking for a chef. CompE"
-    }
+        "id": "re_tst_5",
+        "title": "Irrelevant Job",
+        "company": "CompE",
+        "location": "CityE",
+        "description": "Looking for a chef.",
+        "url": "url5",
+        "date_posted": "2024-01-05",
+        "content": "Irrelevant Job Looking for a chef. CompE",
+    },
 ]
+
 
 class TestRecommendationEngine:
     def setup_method(self):
@@ -55,11 +83,14 @@ class TestRecommendationEngine:
         )
         num_req = 1
         recommendations = RecommendationEngine.get_job_recommendations(
-            skills=sample_skills_re, education=sample_education_re, experience=sample_experience_re,
-            num_recommendations=num_req, cache_key="test1"
+            skills=sample_skills_re,
+            education=sample_education_re,
+            experience=sample_experience_re,
+            num_recommendations=num_req,
+            cache_key="test1",
         )
         assert len(recommendations) == num_req
-        assert recommendations[0]['match_score'] > 0
+        assert recommendations[0]["match_score"] > 0
         mock_job_api_service_fetch.assert_called_once()
         mock_internal_jooble_fetch.assert_not_called()
         assert "test1" in RecommendationEngine._job_cache
@@ -67,30 +98,45 @@ class TestRecommendationEngine:
     def test_get_job_recommendations_fallback_to_internal_jooble(self, mocker):
         mocker.patch.object(JobAPIService, "fetch_jobs", return_value=[])
         mock_internal_jooble_fetch = mocker.patch.object(
-            RecommendationEngine, "_fetch_jobs_from_jooble", return_value=sample_jobs_for_re_tests[2:3]
+            RecommendationEngine,
+            "_fetch_jobs_from_jooble",
+            return_value=sample_jobs_for_re_tests[2:3],
         )
         num_req = 1
         recommendations = RecommendationEngine.get_job_recommendations(
-            skills=sample_skills_re, education=sample_education_re, experience=sample_experience_re,
-            num_recommendations=num_req, cache_key="test2"
+            skills=sample_skills_re,
+            education=sample_education_re,
+            experience=sample_experience_re,
+            num_recommendations=num_req,
+            cache_key="test2",
         )
         assert len(recommendations) == num_req
-        assert recommendations[0]['id'] == sample_jobs_for_re_tests[2]['id']
+        assert recommendations[0]["id"] == sample_jobs_for_re_tests[2]["id"]
         mock_internal_jooble_fetch.assert_called_once()
         assert "test2" in RecommendationEngine._job_cache
 
     def test_get_job_recommendations_cache_hit(self, mocker):
         cache_key = "test_cache_hit_key"
-        cached_data = [{"id": "cached_job_001", "title": "Cached Test Job", "match_score": 99.8}]
+        cached_data = [
+            {"id": "cached_job_001", "title": "Cached Test Job", "match_score": 99.8}
+        ]
         RecommendationEngine._job_cache[cache_key] = cached_data
-        RecommendationEngine._pagination_state[cache_key] = {"current_page_served": 1, "has_more": False}
+        RecommendationEngine._pagination_state[cache_key] = {
+            "current_page_served": 1,
+            "has_more": False,
+        }
 
         mock_job_api_service_fetch = mocker.patch.object(JobAPIService, "fetch_jobs")
-        mock_internal_jooble_fetch = mocker.patch.object(RecommendationEngine, "_fetch_jobs_from_jooble")
+        mock_internal_jooble_fetch = mocker.patch.object(
+            RecommendationEngine, "_fetch_jobs_from_jooble"
+        )
 
         recommendations = RecommendationEngine.get_job_recommendations(
-            skills=sample_skills_re, education=sample_education_re,
-            cache_key=cache_key, force_refresh=False, num_recommendations=1
+            skills=sample_skills_re,
+            education=sample_education_re,
+            cache_key=cache_key,
+            force_refresh=False,
+            num_recommendations=1,
         )
         assert recommendations == cached_data
         mock_job_api_service_fetch.assert_not_called()
@@ -101,31 +147,52 @@ class TestRecommendationEngine:
         RecommendationEngine._job_cache[cache_key] = [{"id": "old_cached_data"}]
         fresh_job_data = [sample_jobs_for_re_tests[0]]
 
-        mock_job_api_service_fetch = mocker.patch.object(JobAPIService, "fetch_jobs", return_value=fresh_job_data)
-        mock_internal_jooble_fetch = mocker.patch.object(RecommendationEngine, "_fetch_jobs_from_jooble")
+        mock_job_api_service_fetch = mocker.patch.object(
+            JobAPIService, "fetch_jobs", return_value=fresh_job_data
+        )
+        mock_internal_jooble_fetch = mocker.patch.object(
+            RecommendationEngine, "_fetch_jobs_from_jooble"
+        )
 
         recommendations = RecommendationEngine.get_job_recommendations(
-            skills=sample_skills_re, education=sample_education_re,
-            cache_key=cache_key, force_refresh=True, num_recommendations=1
+            skills=sample_skills_re,
+            education=sample_education_re,
+            cache_key=cache_key,
+            force_refresh=True,
+            num_recommendations=1,
         )
         assert len(recommendations) == 1
         assert recommendations[0]["id"] == fresh_job_data[0]["id"]
         mock_job_api_service_fetch.assert_called_once()
         mock_internal_jooble_fetch.assert_not_called()
-        assert RecommendationEngine._job_cache[cache_key][0]["id"] == fresh_job_data[0]["id"]
+        assert (
+            RecommendationEngine._job_cache[cache_key][0]["id"]
+            == fresh_job_data[0]["id"]
+        )
 
-    def test_get_job_recommendations_no_skills_experience_uses_education_fallback_keywords(self, mocker):
-        mock_job_api_service_fetch = mocker.patch.object(JobAPIService, "fetch_jobs", return_value=[sample_jobs_for_re_tests[0]])
+    def test_get_job_recommendations_no_skills_experience_uses_education_fallback_keywords(
+        self, mocker
+    ):
+        mock_job_api_service_fetch = mocker.patch.object(
+            JobAPIService, "fetch_jobs", return_value=[sample_jobs_for_re_tests[0]]
+        )
         mocker.patch.object(RecommendationEngine, "_fetch_jobs_from_jooble")
 
         RecommendationEngine.get_job_recommendations(
-            skills=[], experience=[], education=["Quantum Physics PhD"], num_recommendations=1
+            skills=[],
+            experience=[],
+            education=["Quantum Physics PhD"],
+            num_recommendations=1,
         )
         called_keywords = mock_job_api_service_fetch.call_args[1].get("keywords", [])
         assert "Quantum" in called_keywords or "entry" in called_keywords
 
-    def test_get_job_recommendations_no_skills_experience_education_uses_generic_fallback(self, mocker):
-        mock_job_api_service_fetch = mocker.patch.object(JobAPIService, "fetch_jobs", return_value=[sample_jobs_for_re_tests[0]])
+    def test_get_job_recommendations_no_skills_experience_education_uses_generic_fallback(
+        self, mocker
+    ):
+        mock_job_api_service_fetch = mocker.patch.object(
+            JobAPIService, "fetch_jobs", return_value=[sample_jobs_for_re_tests[0]]
+        )
         mocker.patch.object(RecommendationEngine, "_fetch_jobs_from_jooble")
 
         RecommendationEngine.get_job_recommendations(
@@ -134,11 +201,17 @@ class TestRecommendationEngine:
         called_keywords = mock_job_api_service_fetch.call_args[1].get("keywords", [])
         assert "entry" in called_keywords and "level" in called_keywords
 
-    def test_get_job_recommendations_no_jobs_from_any_source_returns_empty(self, mocker):
+    def test_get_job_recommendations_no_jobs_from_any_source_returns_empty(
+        self, mocker
+    ):
         mocker.patch.object(JobAPIService, "fetch_jobs", return_value=[])
-        mocker.patch.object(RecommendationEngine, "_fetch_jobs_from_jooble", return_value=[])
+        mocker.patch.object(
+            RecommendationEngine, "_fetch_jobs_from_jooble", return_value=[]
+        )
         recommendations = RecommendationEngine.get_job_recommendations(
-            skills=sample_skills_re, education=sample_education_re, num_recommendations=1
+            skills=sample_skills_re,
+            education=sample_education_re,
+            num_recommendations=1,
         )
         assert recommendations == []
 
@@ -151,32 +224,47 @@ class TestRecommendationEngine:
             assert 50 <= job.get("match_score", 0) <= 70
 
     def test_match_jobs_to_profile_empty_jobs_list_returns_empty(self):
-        user_profile_str = RecommendationEngine._create_user_profile(sample_skills_re, sample_experience_re, sample_education_re)
+        user_profile_str = RecommendationEngine._create_user_profile(
+            sample_skills_re, sample_experience_re, sample_education_re
+        )
         recommendations = RecommendationEngine._match_jobs_to_profile(
             user_profile=user_profile_str, jobs=[], num_recommendations=2
         )
         assert recommendations == []
 
-    def test_match_jobs_to_profile_tfidf_vectorizer_valueerror_triggers_fallback(self, mocker):
-        user_profile_str = RecommendationEngine._create_user_profile(sample_skills_re, sample_experience_re, sample_education_re)
-        mocker.patch("app.services.ml.recommendation_engine.TfidfVectorizer.fit_transform", side_effect=ValueError("TFIDF crashed"))
-
+    def test_match_jobs_to_profile_tfidf_vectorizer_valueerror_triggers_fallback(
+        self, mocker
+    ):
+        user_profile_str = RecommendationEngine._create_user_profile(
+            sample_skills_re, sample_experience_re, sample_education_re
+        )
+        mocker.patch(
+            "app.services.ml.recommendation_engine.TfidfVectorizer.fit_transform",
+            side_effect=ValueError("TFIDF crashed"),
+        )
 
         recommendations = RecommendationEngine._match_jobs_to_profile(
-            user_profile=user_profile_str, jobs=sample_jobs_for_re_tests, num_recommendations=1
+            user_profile=user_profile_str,
+            jobs=sample_jobs_for_re_tests,
+            num_recommendations=1,
         )
         assert len(recommendations) == 1
         assert 50 <= recommendations[0].get("match_score", 0) <= 70
 
     def test_match_jobs_to_profile_general_exception_triggers_fallback(self, mocker):
-        user_profile_str = RecommendationEngine._create_user_profile(sample_skills_re, sample_experience_re,
-                                                                    sample_education_re)
+        user_profile_str = RecommendationEngine._create_user_profile(
+            sample_skills_re, sample_experience_re, sample_education_re
+        )
 
-        mocker.patch("app.services.ml.recommendation_engine.cosine_similarity",
-                     side_effect=Exception("Cosine sim exploded"))
+        mocker.patch(
+            "app.services.ml.recommendation_engine.cosine_similarity",
+            side_effect=Exception("Cosine sim exploded"),
+        )
 
         recommendations = RecommendationEngine._match_jobs_to_profile(
-            user_profile=user_profile_str, jobs=sample_jobs_for_re_tests, num_recommendations=1
+            user_profile=user_profile_str,
+            jobs=sample_jobs_for_re_tests,
+            num_recommendations=1,
         )
         assert len(recommendations) == 1
         assert 50 <= recommendations[0].get("match_score", 0) <= 70
@@ -194,25 +282,41 @@ class TestRecommendationEngine:
         assert recommendations[0]["match_score"] == 0.0
 
     def test_match_jobs_to_profile_skips_job_with_truly_empty_content_string(self):
-        job_truly_empty = [{"id": "empty_job", "title": "", "description": "", "content": ""}]
+        job_truly_empty = [
+            {"id": "empty_job", "title": "", "description": "", "content": ""}
+        ]
         user_profile_str = "python developer"
-        recommendations = RecommendationEngine._match_jobs_to_profile(user_profile_str, job_truly_empty, 1)
+        recommendations = RecommendationEngine._match_jobs_to_profile(
+            user_profile_str, job_truly_empty, 1
+        )
         assert recommendations == []
 
     def test_fallback_job_ranking_empty_jobs_list_returns_empty(self):
-        ranked_jobs = RecommendationEngine._fallback_job_ranking(jobs=[], num_recommendations=5)
+        ranked_jobs = RecommendationEngine._fallback_job_ranking(
+            jobs=[], num_recommendations=5
+        )
         assert ranked_jobs == []
 
     @patch.object(requests, "post")
     def test_fetch_jobs_from_jooble_success(self, mock_requests_post):
-        api_job_data = [{"id": "jooble_j1", "title": "Jooble Job Alpha", "snippet": "Description alpha", "company": "Jooble Corp", "location": "World"}]
+        api_job_data = [
+            {
+                "id": "jooble_j1",
+                "title": "Jooble Job Alpha",
+                "snippet": "Description alpha",
+                "company": "Jooble Corp",
+                "location": "World",
+            }
+        ]
         mock_api_response = {"jobs": api_job_data}
         mock_response = MagicMock(status_code=200)
         mock_response.json.return_value = mock_api_response
         mock_response.raise_for_status = MagicMock()
         mock_requests_post.return_value = mock_response
 
-        fetched_jobs = RecommendationEngine._fetch_jobs_from_jooble(keywords=["developer"], limit=1)
+        fetched_jobs = RecommendationEngine._fetch_jobs_from_jooble(
+            keywords=["developer"], limit=1
+        )
         assert len(fetched_jobs) == 1
         assert fetched_jobs[0]["id"] == "jooble_j1"
         assert "content" in fetched_jobs[0] and fetched_jobs[0]["content"]
@@ -221,21 +325,29 @@ class TestRecommendationEngine:
     @patch.object(requests, "post")
     def test_fetch_jobs_from_jooble_http_error(self, mock_requests_post):
         mock_response = MagicMock()
-        mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError("Jooble API unavailable")
+        mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError(
+            "Jooble API unavailable"
+        )
         mock_requests_post.return_value = mock_response
         fetched_jobs = RecommendationEngine._fetch_jobs_from_jooble(keywords=["qa"])
         assert fetched_jobs == []
 
     @patch.object(requests, "post")
     def test_fetch_jobs_from_jooble_request_timeout(self, mock_requests_post):
-        mock_requests_post.side_effect = requests.exceptions.Timeout("Connection timed out")
-        fetched_jobs = RecommendationEngine._fetch_jobs_from_jooble(keywords=["manager"])
+        mock_requests_post.side_effect = requests.exceptions.Timeout(
+            "Connection timed out"
+        )
+        fetched_jobs = RecommendationEngine._fetch_jobs_from_jooble(
+            keywords=["manager"]
+        )
         assert fetched_jobs == []
 
     @patch.object(requests, "post")
     def test_fetch_jobs_from_jooble_unexpected_exception(self, mock_requests_post):
         mock_requests_post.side_effect = ValueError("Unexpected error during request")
-        fetched_jobs = RecommendationEngine._fetch_jobs_from_jooble(keywords=["analyst"])
+        fetched_jobs = RecommendationEngine._fetch_jobs_from_jooble(
+            keywords=["analyst"]
+        )
         assert fetched_jobs == []
 
     @patch.object(requests, "post")
@@ -249,13 +361,19 @@ class TestRecommendationEngine:
         assert fetched_jobs == []
 
     @patch.object(requests, "post")
-    def test_fetch_jobs_from_jooble_response_job_item_not_dict(self, mock_requests_post):
-        mock_api_response = {"jobs": ["just a string", {"id": "j002", "title": "Good Job"}]}
+    def test_fetch_jobs_from_jooble_response_job_item_not_dict(
+        self, mock_requests_post
+    ):
+        mock_api_response = {
+            "jobs": ["just a string", {"id": "j002", "title": "Good Job"}]
+        }
         mock_response = MagicMock(status_code=200)
         mock_response.json.return_value = mock_api_response
         mock_response.raise_for_status = MagicMock()
         mock_requests_post.return_value = mock_response
-        fetched_jobs = RecommendationEngine._fetch_jobs_from_jooble(keywords=["engineer"])
+        fetched_jobs = RecommendationEngine._fetch_jobs_from_jooble(
+            keywords=["engineer"]
+        )
         assert len(fetched_jobs) == 1
         assert fetched_jobs[0]["id"] == "j002"
 
@@ -283,7 +401,9 @@ class TestRecommendationEngine:
     @patch.object(RecommendationEngine, "_fetch_jobs_from_jooble")
     def test_get_job_stats_no_jobs_fetched(self, mock_fetch_jooble):
         mock_fetch_jooble.return_value = []
-        stats = RecommendationEngine.get_job_stats(skills=["ux"], experience=[], education=[])
+        stats = RecommendationEngine.get_job_stats(
+            skills=["ux"], experience=[], education=[]
+        )
         assert stats["total_matching_jobs"] == 0
         assert stats["top_skills"] == []
         assert stats["locations"] == {}
@@ -293,17 +413,34 @@ class TestRecommendationEngine:
     @patch.object(RecommendationEngine, "_fetch_jobs_from_jooble")
     def test_get_job_stats_processes_data_correctly(self, mock_fetch_jooble):
         mock_jobs_data = [
-            {"title": "Python Developer Full-time", "description": "Need python, java skill. Salary LKR100000.",
-             "location": "Colombo", "salary": "LKR 100,000 - 150,000 per month"},
-            {"title": "Java Contract Role",
-             "description": "Core Java expert for a 6-month contract. JavaScript is a plus.", "location": "Remote",
-             "salary": "USD 50 per hour"},
-            {"title": "Python Intern (Full time)", "description": "Learn python on the job.", "location": "Colombo",
-             "salary": "allowance 30k"},
-            {"title": "Project Manager (Agile)", "description": "Agile and Scrum master.", "location": "Kandy"}
+            {
+                "title": "Python Developer Full-time",
+                "description": "Need python, java skill. Salary LKR100000.",
+                "location": "Colombo",
+                "salary": "LKR 100,000 - 150,000 per month",
+            },
+            {
+                "title": "Java Contract Role",
+                "description": "Core Java expert for a 6-month contract. JavaScript is a plus.",
+                "location": "Remote",
+                "salary": "USD 50 per hour",
+            },
+            {
+                "title": "Python Intern (Full time)",
+                "description": "Learn python on the job.",
+                "location": "Colombo",
+                "salary": "allowance 30k",
+            },
+            {
+                "title": "Project Manager (Agile)",
+                "description": "Agile and Scrum master.",
+                "location": "Kandy",
+            },
         ]
         mock_fetch_jooble.return_value = mock_jobs_data
-        stats = RecommendationEngine.get_job_stats(skills=["python", "java"], experience=[], education=[])
+        stats = RecommendationEngine.get_job_stats(
+            skills=["python", "java"], experience=[], education=[]
+        )
 
         assert stats["total_matching_jobs"] == 4
         assert "python" in stats["top_skills"]
@@ -312,11 +449,15 @@ class TestRecommendationEngine:
         assert stats["salary_range"]["min"] == 30.0
         assert stats["salary_range"]["max"] == 100000.0
         assert stats["salary_range"]["avg"] == 33360
-        assert "Full-time" in stats["job_types"] and stats["job_types"]["Full-time"] >= 2
+        assert (
+            "Full-time" in stats["job_types"] and stats["job_types"]["Full-time"] >= 2
+        )
         assert "Contract" in stats["job_types"] and stats["job_types"]["Contract"] >= 1
 
     def test_search_jobs_placeholder_returns_empty_list(self):
-        result = RecommendationEngine.search_jobs(query="anything", location="anywhere", page=1, size=10)
+        result = RecommendationEngine.search_jobs(
+            query="anything", location="anywhere", page=1, size=10
+        )
         assert result == []
 
     def test_has_more_jobs_with_state(self):
@@ -327,4 +468,6 @@ class TestRecommendationEngine:
         assert RecommendationEngine.has_more_jobs(cache_key) is False
 
     def test_has_more_jobs_no_state_returns_false(self):
-        assert RecommendationEngine.has_more_jobs("non_existent_key_pagination") is False
+        assert (
+            RecommendationEngine.has_more_jobs("non_existent_key_pagination") is False
+        )

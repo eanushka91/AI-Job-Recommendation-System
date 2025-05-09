@@ -1,6 +1,7 @@
 import requests
 from typing import List, Dict, Any, Optional
 
+
 class JobAPIService:
     """Service for fetching real-time job listings from Jooble API"""
 
@@ -17,9 +18,7 @@ class JobAPIService:
         try:
             from app.config import settings as app_settings
 
-            api_key = getattr(
-                app_settings, "JOOBLE_API_KEY", None
-            )
+            api_key = getattr(app_settings, "JOOBLE_API_KEY", None)
         except ImportError:
             print(
                 "Critical Error: app.config.settings module could not be imported in JobAPIService."
@@ -104,9 +103,7 @@ class JobAPIService:
             return []
 
         for job_data in jobs_list:
-            if not isinstance(
-                job_data, dict
-            ):
+            if not isinstance(job_data, dict):
                 print(
                     f"JobAPIService Process Warning: Skipping non-dictionary job item: {job_data}"
                 )

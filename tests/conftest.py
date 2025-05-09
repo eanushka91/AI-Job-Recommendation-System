@@ -43,9 +43,7 @@ except ImportError:
     )
     TEST_DB_HOST = os.getenv("TEST_DB_HOST", "localhost")
     TEST_DB_PORT = os.getenv("TEST_DB_PORT", "5432")
-    TEST_DB_NAME = os.getenv(
-        "TEST_DB_NAME", "test_db_placeholder"
-    )
+    TEST_DB_NAME = os.getenv("TEST_DB_NAME", "test_db_placeholder")
     TEST_DB_USER = os.getenv("TEST_DB_USER", "test_user_placeholder")
     TEST_DB_PASSWORD = os.getenv("TEST_DB_PASSWORD", "test_password_placeholder")
 
@@ -100,6 +98,7 @@ def client():
 
     with TestClient(app) as test_client:
         yield test_client
+
 
 @pytest.fixture
 def mock_s3_upload(mocker):

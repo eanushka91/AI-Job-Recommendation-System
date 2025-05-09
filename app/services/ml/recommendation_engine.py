@@ -15,9 +15,7 @@ class RecommendationEngine:
     _job_cache: Dict[str, List[Dict[str, Any]]] = {}
     _pagination_state: Dict[str, Dict[str, Any]] = {}
 
-    JOOBLE_API_KEY_RE = (
-        "70587e41-5ac1-49f7-a9e8-a388a12308dc"
-    )
+    JOOBLE_API_KEY_RE = "70587e41-5ac1-49f7-a9e8-a388a12308dc"
     JOOBLE_API_URL = "https://jooble.org/api/"
 
     @staticmethod
@@ -155,9 +153,7 @@ class RecommendationEngine:
             f"RE Match: Starting profile matching for {len(jobs)} jobs, requesting top {num_recommendations}."
         )
         if not user_profile or not jobs:
-            logger.warning(
-                "RE Match: User profile or jobs list is empty."
-            )
+            logger.warning("RE Match: User profile or jobs list is empty.")
             return []
         job_contents, valid_jobs = [], []
         for job in jobs:
@@ -288,9 +284,7 @@ class RecommendationEngine:
                 return []
             for job_data in api_jobs:
                 if not isinstance(job_data, dict):
-                    logger.warning(
-                        f"RE Jooble Fetch: Skipping non-dict: {job_data}"
-                    )
+                    logger.warning(f"RE Jooble Fetch: Skipping non-dict: {job_data}")
                     continue
                 title = job_data.get("title", "")
                 snippet = job_data.get("snippet", "")

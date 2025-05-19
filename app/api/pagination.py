@@ -5,7 +5,7 @@ from pydantic import BaseModel
 try:
     from app.config.settings import PAGE_SIZE
 except ImportError:
-    PAGE_SIZE = 10
+    PAGE_SIZE = 50
 
 T = TypeVar("T")
 

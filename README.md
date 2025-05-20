@@ -77,9 +77,6 @@ docker build -t ai-job-recommendation .
 docker run -d -p 8000:8000 --env-file .env ai-job-recommendation
 
 🧪 Running Tests
-bash
-Copy
-Edit
 pytest
 
 🔄 CI/CD with GitHub Actions
@@ -105,5 +102,5 @@ GET /profile/{user_id} - Retrieve user profile data
 
 📬 Contact
 For feedback or contributions, open an issue or create a pull request.
-
+```
 © 2025 Anushka Eshan | All rights reserved.

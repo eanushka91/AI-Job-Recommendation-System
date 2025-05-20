@@ -1,116 +1,109 @@
-# CV Upload & Job Recommendation System
+# 🧠 AI Job Recommendation System
 
-A FastAPI-based application that allows users to upload their CV, extracts skills, education, and experience, and provides AI-powered job recommendations matching their profile.
+This is an AI-powered job recommendation platform built with FastAPI (Python) that uses a Large Language Model (LLM) to generate personalized job suggestions. The system supports CV uploads to AWS S3, uses PostgreSQL for data storage, and offers paginated job listings. CI is managed through GitHub Actions, and the backend runs as a Docker container.
 
-## Features
+## 🚀 Features
 
-- CV file upload to Amazon S3
-- Storage of CV metadata in PostgreSQL database
-- AI-powered job recommendation engine that matches user skills with job listings
-- Integration with external job API for real-time job data
-- REST API for CV management and job recommendations
+- 🔍 AI-generated job recommendations using LLM
+- 📄 CV upload and storage via AWS S3
+- 🔁 Job list pagination (10 jobs per page)
+- 📦 Backend API with FastAPI (Python)
+- 🗃️ PostgreSQL for database management
+- 🐳 Dockerized for easy deployment
+- 🔄 CI pipeline via GitHub Actions
 
-## Project Structure
+## 🛠️ Tech Stack
 
-```
-my-cv-upload-project/
-│
-├── .env                     # Environment variables
+- **Backend**: Python, FastAPI
+- **Database**: PostgreSQL
+- **CI/CD**: GitHub Actions
+- **AI**: LLM (e.g., OpenAI, Hugging Face)
+- **Storage**: AWS S3 (for CVs)
+- **Containerization**: Docker
+
+## 📁 Project Structure
+
+ai-job-recommendation/
 │
 ├── app/
-│   ├── __init__.py          # Makes app directory a Python package
-│   │
-│   ├── main.py              # Main FastAPI application entry point
-│   │
-│   ├── config/
-│   │   ├── __init__.py
-│   │   └── settings.py      # App configuration and environment settings
-│   │
-│   ├── db/
-│   │   ├── __init__.py
-│   │   ├── database.py      # Database connection handling
-│   │   └── models.py        # Database models/schema
-│   │
-│   ├── services/
-│   │   ├── __init__.py
-│   │   ├── s3_service.py    # S3 upload functionality
-│   │   ├── job_api_service.py # Service for fetching job listings
-│   │   └── recommendation_engine.py # AI recommendation engine
-│   │
-│   └── api/
-│       ├── __init__.py
-│       ├── routes.py        # API route definitions
-│       └── schemas.py       # Pydantic models for request/response validation
+│ ├── main.py # FastAPI app entry point
+│ ├── models/ # Pydantic models and DB models
+│ ├── routes/ # API routes
+│ ├── services/ # LLM logic and S3 upload services
+│ └── utils/ # Helper functions
 │
-├── requirements.txt         # Project dependencies
-│
-└── README.md                # Project documentation
-```
+├── tests/ # Unit and integration tests
+├── Dockerfile # Docker image config
+├── requirements.txt # Python dependencies
+├── .github/workflows/ # GitHub Actions workflows
+└── README.md # This file
 
-## Setup Instructions
+## 📦 Getting Started
 
 ### Prerequisites
 
-- Python 3.9+
+- Python 3.10+
+- Docker
+- AWS CLI (configured)
 - PostgreSQL database
-- AWS account with S3 access
-- API Ninjas API key (for job data)
+
+### Environment Variables
+
+Create a `.env` file in the root:
+
+DATABASE_URL=postgresql://user:password@localhost:5432/dbname
+AWS_ACCESS_KEY_ID=your_aws_key
+AWS_SECRET_ACCESS_KEY=your_aws_secret
+S3_BUCKET_NAME=your_bucket_name
+OPENAI_API_KEY=your_openai_key # or relevant LLM API key
+
+
 
 ### Installation
 
-1. Clone the repository
+```bash
+git clone https://github.com/your-username/ai-job-recommendation.git
+cd ai-job-recommendation
+pip install -r requirements.txt
+uvicorn app.main:app --reload
 
-2. Create a virtual environment and activate it:
-   ```
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
+🐳 Docker
+To build and run the Docker container:
 
-3. Install dependencies:
-   ```
-   pip install -r requirements.txt
-   ```
+bash
+Copy
+Edit
+docker build -t ai-job-recommendation .
+docker run -d -p 8000:8000 --env-file .env ai-job-recommendation
 
-4. Create a `.env` file in the project root with your configuration (see the sample .env file)
+🧪 Running Tests
+bash
+Copy
+Edit
+pytest
 
-5. Create the PostgreSQL database:
-   ```
-   createdb cv_upload_db  # Or use your preferred method
-   ```
+🔄 CI/CD with GitHub Actions
+CI is configured in .github/workflows/ci.yml to:
 
-6. Run the application:
-   ```
-   uvicorn app.main:app --reload
-   ```
+Lint code
 
-7. Access the API documentation at http://localhost:8000/docs
+Run tests
 
-## API Endpoints
+Build Docker image
 
-- `POST /api/upload-cv` - Upload CV and get job recommendations
-- `GET /api/users/{user_id}` - Get user data
-- `GET /api/resumes/user/{user_id}` - Get all resumes for a user
-- `GET /api/resumes/{resume_id}` - Get a specific resume
-- `GET /api/job-recommendations/{resume_id}` - Get job recommendations for an existing resume
+📤 Uploading CVs
+PDFs uploaded via the API are stored in AWS S3. Ensure correct permissions and bucket policies are in place.
 
-## AI Recommendation Engine
+📚 API Endpoints
+POST /recommend - Get job recommendations from LLM
 
-The system uses a content-based recommendation approach:
+GET /jobs?page=1 - Paginated job list
 
-1. User CV data (skills, experience, education) is processed and vectorized
-2. Real-time job listings are fetched from an external API
-3. TF-IDF and cosine similarity are used to match the user profile with job listings
-4. Jobs are ranked by match score and returned to the user
+POST /upload-cv - Upload CV to AWS S3
 
-## Development
+GET /profile/{user_id} - Retrieve user profile data
 
-To contribute to this project:
+📬 Contact
+For feedback or contributions, open an issue or create a pull request.
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Submit a pull request
-
-## License
-
-This project is licensed under the MIT License.
+© 2025 Anushka Eshan | All rights reserved.
